@@ -14,3 +14,6 @@ A docker server version can be found at https://hub.docker.com/r/er1807/vrcws. W
 But you are free to use wss://vrcws.er1807.de/VRC 
 
 Just don't be stupid. Also I can't say that the server will be running 24/7.
+
+You can change your connected server and if you wanna be connected in the Molonsettings. Not that mods building upon this mod can use this default or specify their own server.
+![image](https://user-images.githubusercontent.com/20169013/134067335-9025f8af-486f-4d09-80c6-a84ddad19637.png)
