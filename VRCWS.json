@@ -1,0 +1,20 @@
+{
+  "_id": 263,
+  "name": "VRCWSLibary",
+  "modversion": "1.0.1",
+  "vrchatversion": "1132",
+  "loaderversion": "v0.4.3 Open-Beta",
+  "modtype": "Mod",
+  "author": "Eric van Fandenfart",
+  "description": "Library to allow for mods to communicate with other clients over events outside of VRCNetwork/RPC system.\n For further details please read the github readme and the examples how to use it and also for the security of this and options.",
+  "searchtags": [
+    "Library", "Network", "Events"
+  ],
+  "requirements": [
+    "[VRChatUtilityKit](https://github.com/loukylor/VRC-Mods/tree/main/VRChatUtilityKit)"
+  ],
+  "downloadlink": "https://github.com/Er1807/VRCWS/releases/download/v1.0.1/VRCWS.dll",
+  "sourcelink": "https://github.com/Er1807/VRCWS",
+  "changelog": "-",
+  "embedcolor": "7F60CA"
+}
