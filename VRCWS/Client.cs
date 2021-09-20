@@ -4,14 +4,14 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using System.Net.WebSockets;
+using WebSocketSharp;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using VRChatUtilityKit.Utilities;
 using VRCWS;
 
-[assembly: MelonInfo(typeof(VRCWSLibaryMod), "VRCWSLibary", "1.0.1", "Eric van Fandenfart")]
+[assembly: MelonInfo(typeof(VRCWSLibaryMod), "VRCWSLibary", "1.0.2", "Eric van Fandenfart")]
 [assembly: MelonGame]
 
 
@@ -64,7 +64,7 @@ namespace VRCWS
 
         public static bool ClientAvailable() => client != null && client.connected;
 
-        private ClientWebSocket ws;
+        private WebSocket ws;
         public event MessageEvent MessageRecieved;
         public event ConnectEvent Connected;
         public bool connected = false;
@@ -93,8 +93,6 @@ namespace VRCWS
                 
         private string server;
         public int retryCount = 0;
-        private object CheckConnectionToken;
-        private object SetUserIDToken;
 
         public async void Connect(string server)
         {
@@ -102,58 +100,29 @@ namespace VRCWS
             this.server = server;
             await AsyncUtils.YieldToMainThread();
             Disconnect();
-            try
-            {
-                MelonLogger.Msg($"Connecting to {server}");
-                ws = new ClientWebSocket();
-                await ws.ConnectAsync(new Uri(server), CancellationToken.None);
-                
-                Task.Run(() =>
-                {
-                    Recieve();
-                });
-                CheckConnectionToken = MelonCoroutines.Start(CheckConnection());
-                if(SetUserIDToken != null)
-                    MelonCoroutines.Stop(SetUserIDToken);
-                SetUserIDToken = MelonCoroutines.Start(SetUserID());
+           
+            MelonLogger.Msg($"Connecting to {server}");
+            ws = new WebSocket(server);
+            ws.OnMessage += Recieve;
+            ws.OnError += Reconnect;
+            ws.OnClose += (_, close) => { connected = false;  if (!close.WasClean) Reconnect(null, null); };
+            ws.EmitOnPing = false;
+            ws.OnOpen += (_,_2) => {
+                MelonCoroutines.Start(SetUserID());
                 MelonLogger.Msg($"Connected to {server}");
-            }
-            catch (Exception)
-            {
-                MelonLogger.Msg($"Connection to {server} failed");
-                Retry();
-            }
-        }
-
-        private IEnumerator CheckConnection()
-        {
-            while (ws.State == WebSocketState.Open)
-                yield return null;
-            
-            Retry();
+            };
+            ws.ConnectAsync();
             
         }
 
-        public async void Disconnect()
+
+        public void Disconnect()
         { 
-            if(CheckConnectionToken!=null)
-                MelonCoroutines.Stop(CheckConnectionToken);
-            CheckConnectionToken = null;
             MelonLogger.Msg("Disconnecting");
             connected = false;
-            await AsyncUtils.YieldToMainThread();
-            try
-            {
-                if (ws != null && ws.State == WebSocketState.Open)
-                {
-                    ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "Restart", CancellationToken.None).Wait();
-                }
-            }
-            catch (Exception)
-            {
-                MelonLogger.Msg("Error while dissconnecting;");
-                ws = null;
-            }
+            //AsyncUtils.YieldToMainThread();
+            if(ws != null)
+                ws.Close();
             
         }
 
@@ -196,17 +165,15 @@ namespace VRCWS
         private async void Send(string msg)
         {
             await AsyncUtils.YieldToMainThread();
-            if (ws.State == WebSocketState.Open)
+            if (ws.IsAlive)
             {
-                MelonLogger.Msg(msg);
-                await ws.SendAsync(new ArraySegment<byte>(Encoding.UTF8.GetBytes(msg)), WebSocketMessageType.Text, true, CancellationToken.None);
+                ws.Send(msg);
             }
             else
             {
-
-                MelonLogger.Msg("Couldnt send " + msg);
-                MelonLogger.Msg("reason " + ws.State);
+                MelonLogger.Msg("Couldnt send "+msg);
             }
+            
         }
         public IEnumerator SetUserID()
         {
@@ -219,53 +186,37 @@ namespace VRCWS
             Send(new Message() { Method = "StartConnection", Content = userID });
             
         }
-        private async void Recieve()
+
+        private void Recieve(object sender, MessageEventArgs e)
         {
-            try
+            MelonLogger.Msg(e.Data);
+            Message msg = JsonConvert.DeserializeObject<Message>(e.Data);
+            MessageRecieved?.Invoke(msg);
+            if (msg.Method == "OnlineStatus")
             {
-                const int maxMessageSize = 1024;
-                byte[] receiveBuffer = new byte[maxMessageSize];
-                while (ws.State == WebSocketState.Open)
-                {
-                    WebSocketReceiveResult receiveResult = await ws.ReceiveAsync(new ArraySegment<byte>(receiveBuffer), CancellationToken.None);
-                    if (receiveResult.MessageType == WebSocketMessageType.Text)
-                    {
-                        var receivedString = Encoding.UTF8.GetString(receiveBuffer, 0, receiveResult.Count);
-                        MelonLogger.Msg(receivedString);
-                        Message msg = JsonConvert.DeserializeObject<Message>(receivedString);
-                        MessageRecieved?.Invoke(msg);
-                        if (msg.Method == "OnlineStatus")
-                        {
-                            OnlineRecieved?.Invoke(msg.Target, msg.Content == "Online");
-                        }
-                        else if (msg.Method == "Error")
-                        {
-                            ErrorRecieved?.Invoke(msg);
-                        }
-                        else if (msg.Method == "MethodsUpdated")
-                        {
-                            //Nothing
-                        }
-                        else if (msg.Method == "Connected")
-                        {
-                            connected = true;
-                            Connected?.Invoke();
-                        }
-                        else
-                        {
-                            if (Methods.ContainsKey(msg.Method))
-                                Methods[msg.Method]?.Invoke(msg);
-                        }
-                    }
-                }
+                OnlineRecieved?.Invoke(msg.Target, msg.Content == "Online");
             }
-            catch (Exception)
+            else if (msg.Method == "Error")
             {
-                MelonLogger.Msg("Reciever errored");
+                ErrorRecieved?.Invoke(msg);
+            }
+            else if (msg.Method == "MethodsUpdated")
+            {
+                //Nothing
+            }
+            else if (msg.Method == "Connected")
+            {
+                connected = true;
+                Connected?.Invoke();
+            }
+            else
+            {
+                if (Methods.ContainsKey(msg.Method))
+                    Methods[msg.Method]?.Invoke(msg);
             }
         }
 
-        private void Retry()
+        private void Reconnect(object sender, EventArgs e)
         {
             retryCount += 1;
             connected = false;
@@ -275,7 +226,7 @@ namespace VRCWS
                 return;
             }
             MelonLogger.Msg("Retrying to establish connection");
-            MelonCoroutines.Start(RetryConnect(retryCount * 5));
+            MelonCoroutines.Start(RetryConnect(retryCount * 10));
         }
         public IEnumerator RetryConnect(int waititt)
         {
