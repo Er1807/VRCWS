@@ -27,7 +27,9 @@ namespace Server
         public static Dictionary<string, VRCWS> userIDToVRCWS = new Dictionary<string, VRCWS>();
 
         public string userID;
-        public List<string> acceptableMethods = new List<string>();
+        public string world;
+
+        public List<Tuple<string,bool>> acceptableMethods = new List<Tuple<string, bool>>();
 
         protected override void OnMessage(MessageEventArgs e)
         {
@@ -50,15 +52,21 @@ namespace Server
                 Send(new Message() { Method = "Error", Content = "StartConnectionFirst" });
                 return;
             }
-
-            if (msg.Method == "AcceptMethod")
+            if (msg.Method == "SetWorld")
             {
-                acceptableMethods.Add(msg.Content);
+                world = msg.Content;
+                Send(new Message() { Method = "MethodsUpdated" });
+            }
+            else if (msg.Method == "AcceptMethod")
+            {
+                var arr = msg.Content.Split(";");
+                acceptableMethods.Add(new Tuple<string, bool>(arr[0], arr[1] == "true"));
                 Send(new Message() { Method = "MethodsUpdated" });
             }
             else if(msg.Method == "RemoveMethod")
             {
-                acceptableMethods.Remove(msg.Content);
+                var item = acceptableMethods.FirstOrDefault(x => x.Item1 == msg.Content);
+                acceptableMethods.Remove(item);
                 Send(new Message() { Method = "MethodsUpdated"});
             }
             else if (msg.Method == "IsOnline")
@@ -78,7 +86,8 @@ namespace Server
                     return;
                 }
                 var remoteUser = userIDToVRCWS[msg.Target];
-                if(!remoteUser.acceptableMethods.Contains(msg.Method))
+                var item = remoteUser.acceptableMethods.First(x => x.Item1 == msg.Content);
+                if(item==null || item.Item2 && world != remoteUser.world)
                 {
                     Send(new Message() { Method = "Error", Target = msg.Target, Content = "MethodNotAcepted" });
                     return;

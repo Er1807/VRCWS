@@ -3,21 +3,18 @@ using Newtonsoft.Json;
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
 using WebSocketSharp;
-using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
 using VRChatUtilityKit.Utilities;
-using VRCWS;
+using VRCWSLibary;
+using System.Linq;
 
 [assembly: MelonInfo(typeof(VRCWSLibaryMod), "VRCWSLibary", "1.0.2", "Eric van Fandenfart")]
 [assembly: MelonGame]
 
 
-namespace VRCWS
+namespace VRCWSLibary
 {
-    
+
 
     public class Message
     {
@@ -28,6 +25,16 @@ namespace VRCWS
         public override string ToString()
         {
             return $"{Method} - {Target} - {Content}";
+        }
+    }
+    public class AcceptedMethod
+    {
+        public string Method { get; set; }
+        public bool WorldOnly { get; set; }
+
+        public override string ToString()
+        {
+            return $"{Method} - {WorldOnly}";
         }
     }
 
@@ -74,7 +81,7 @@ namespace VRCWS
         public delegate void ConnectEvent();
         public delegate void OnlineEvent(string userID, bool online);
 
-        public Dictionary<string, MessageEvent> Methods = new Dictionary<string, MessageEvent>();
+        public Dictionary<AcceptedMethod, MessageEvent> Methods = new Dictionary<AcceptedMethod, MessageEvent>();
 
 
         public Client()
@@ -127,30 +134,31 @@ namespace VRCWS
         }
 
         //https://forum.unity.com/threads/solved-dictionary-of-delegate-such-that-each-value-hold-multiple-methods.506880/
-        public void RegisterEvent(string method, MessageEvent e)
+        public void RegisterEvent(string method, MessageEvent e, bool worldOnly = true)
         {
             MelonLogger.Msg($"Registering Event {method}");
+            AcceptedMethod acceptedMethod = new AcceptedMethod() {Method = method, WorldOnly = worldOnly };
             MessageEvent EventStored;
-            if (Methods.TryGetValue(method, out EventStored))
+            if (Methods.TryGetValue(acceptedMethod, out EventStored))
             {
                 EventStored += e;
-                Methods[method] = EventStored; // Copy the newly aggregated delegate back into the dictionary.
+                Methods[acceptedMethod] = EventStored; // Copy the newly aggregated delegate back into the dictionary.
             }
             else
             {
                 EventStored += e;
-                Methods.Add(method, EventStored);
+                Methods.Add(acceptedMethod, EventStored);
                 if (connected)
-                    AcceptMethod(method);
+                    AcceptMethod(acceptedMethod);
             }
         }
-        private void AcceptMethod(string method)
+        private void AcceptMethod(AcceptedMethod method)
         {
-            Send(new Message() { Method = "AcceptMethod", Content = method });
+            Send(new Message() { Method = "AcceptMethod", Content =$"{method};{method.WorldOnly}"  });
         }
-        private void RemoveMethod(string method)
+        private void RemoveMethod(AcceptedMethod method)
         {
-            Send(new Message() { Method = "RemoveMethod", Content = method });
+            Send(new Message() { Method = "RemoveMethod", Content = method.Method });
         }
 
         public void IsUserOnline(string userID)
@@ -182,9 +190,12 @@ namespace VRCWS
 
             string userID = VRCPlayer.field_Internal_Static_VRCPlayer_0.prop_String_2;
             
+            
+
             MelonLogger.Msg("Connecting as " + userID);
             Send(new Message() { Method = "StartConnection", Content = userID });
-            
+            Send(new Message() { Method = "SetWorld", Content = RoomManager.prop_String_0 });
+
         }
 
         private void Recieve(object sender, MessageEventArgs e)
@@ -211,8 +222,9 @@ namespace VRCWS
             }
             else
             {
-                if (Methods.ContainsKey(msg.Method))
-                    Methods[msg.Method]?.Invoke(msg);
+                var item = Methods.Keys.First(x => x.Method == msg.Method);
+                if (item != null)
+                    Methods[item]?.Invoke(msg);
             }
         }
 
