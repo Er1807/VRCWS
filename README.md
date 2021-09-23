@@ -5,7 +5,7 @@ VRCWS is a libary to enable communication between multiple clients in VRC based 
 For an example code look in the [TextChat.cs](https://github.com/Er1807/VRCTextChat/blob/main/Client/TextChat.cs) file of another project of mine or [VRCWSLibaryIntegration.cs](https://github.com/Er1807/FreezeFrame/blob/main/VRCWSLibaryIntegration.cs) of FreezeFrame
 
 As a general note of caution. Don't trust that the origin or reciever of the message is the real one. Everyone can say they are someone else.
-Currently on the first starts it needs around 3-4 attempts to connect successfully. No idea why -_-
+When connecting to any world a hash of the world instance is send to the server. By default unless mods opt-in to recieve events from anyone only people in the same world can send you events. This is a setting per event.
 
 It is possible to create a new Instance of Client and therefore connect to another server. Also the main server for the default client can be changed.
 
