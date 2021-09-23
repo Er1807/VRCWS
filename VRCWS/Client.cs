@@ -7,6 +7,9 @@ using WebSocketSharp;
 using VRChatUtilityKit.Utilities;
 using VRCWSLibary;
 using System.Linq;
+using HarmonyLib;
+using System.Security.Cryptography;
+using System.Text;
 
 [assembly: MelonInfo(typeof(VRCWSLibaryMod), "VRCWSLibary", "1.0.2", "Eric van Fandenfart")]
 [assembly: MelonGame]
@@ -51,6 +54,9 @@ namespace VRCWSLibary
                 if (newValue) Client.GetClient().Connect(entryURL.Value);
                 else Client.GetClient().Disconnect();
             };
+
+            HarmonyInstance.Patch(typeof(NetworkManager).GetMethod("OnJoinedRoom"), new HarmonyMethod(typeof(Client).GetMethod("OnJoinedRoom")));
+
             if (entryConnect.Value)
                 Client.GetClient().Connect(entryURL.Value);
         }
@@ -71,6 +77,8 @@ namespace VRCWSLibary
 
         public static bool ClientAvailable() => client != null && client.connected;
 
+        private static List<Client> allClients = new List<Client>();
+
         private WebSocket ws;
         public event MessageEvent MessageRecieved;
         public event ConnectEvent Connected;
@@ -86,6 +94,7 @@ namespace VRCWSLibary
 
         public Client()
         {
+            allClients.Add(this);
             Connected += () =>
             {
                 foreach (var item in Methods.Keys)
@@ -122,6 +131,16 @@ namespace VRCWSLibary
             
         }
 
+        public static void OnJoinedRoom()
+        {
+            foreach (var item in allClients)
+            {
+                if (item.connected)
+                {
+                    item.SetWorldID();
+                }
+            }
+        }
 
         public void Disconnect()
         { 
@@ -154,7 +173,7 @@ namespace VRCWSLibary
         }
         private void AcceptMethod(AcceptedMethod method)
         {
-            Send(new Message() { Method = "AcceptMethod", Content =$"{method};{method.WorldOnly}"  });
+            Send(new Message() { Method = "AcceptMethod", Target = method.Method, Content =method.WorldOnly?"true":"false"  });
         }
         private void RemoveMethod(AcceptedMethod method)
         {
@@ -194,8 +213,16 @@ namespace VRCWSLibary
 
             MelonLogger.Msg("Connecting as " + userID);
             Send(new Message() { Method = "StartConnection", Content = userID });
-            Send(new Message() { Method = "SetWorld", Content = RoomManager.prop_String_0 });
+            SetWorldID();
+        }
 
+        public void SetWorldID()
+        {
+
+            //https://github.com/loukylor/VRC-Mods/blob/main/VRChatUtilityKit/Utilities/DataUtils.cs
+            SHA256 sha256 = SHA256.Create();
+            string hashedWorldID = Convert.ToBase64String(sha256.ComputeHash(Encoding.UTF8.GetBytes(RoomManager.prop_String_0)));
+            Send(new Message() { Method = "SetWorld", Content = hashedWorldID });
         }
 
         private void Recieve(object sender, MessageEventArgs e)
@@ -215,6 +242,10 @@ namespace VRCWSLibary
             {
                 //Nothing
             }
+            else if (msg.Method == "WorldUpdated")
+            {
+                //Nothing
+            }
             else if (msg.Method == "Connected")
             {
                 connected = true;
@@ -222,7 +253,7 @@ namespace VRCWSLibary
             }
             else
             {
-                var item = Methods.Keys.First(x => x.Method == msg.Method);
+                var item = Methods.Keys.FirstOrDefault(x => x.Method == msg.Method);
                 if (item != null)
                     Methods[item]?.Invoke(msg);
             }

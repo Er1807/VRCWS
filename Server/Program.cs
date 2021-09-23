@@ -24,12 +24,23 @@ namespace Server
             }
         }
 
+        public class AcceptedMethod
+        {
+            public string Method { get; set; }
+            public bool WorldOnly { get; set; }
+
+            public override string ToString()
+            {
+                return $"{Method} - {WorldOnly}";
+            }
+        }
+
         public static Dictionary<string, VRCWS> userIDToVRCWS = new Dictionary<string, VRCWS>();
 
         public string userID;
         public string world;
 
-        public List<Tuple<string,bool>> acceptableMethods = new List<Tuple<string, bool>>();
+        public List<AcceptedMethod> acceptableMethods = new List<AcceptedMethod>();
 
         protected override void OnMessage(MessageEventArgs e)
         {
@@ -55,17 +66,16 @@ namespace Server
             if (msg.Method == "SetWorld")
             {
                 world = msg.Content;
-                Send(new Message() { Method = "MethodsUpdated" });
+                Send(new Message() { Method = "WorldUpdated" });
             }
             else if (msg.Method == "AcceptMethod")
             {
-                var arr = msg.Content.Split(";");
-                acceptableMethods.Add(new Tuple<string, bool>(arr[0], arr[1] == "true"));
+                acceptableMethods.Add(new AcceptedMethod() { Method = msg.Target, WorldOnly = msg.Content=="true"});
                 Send(new Message() { Method = "MethodsUpdated" });
             }
             else if(msg.Method == "RemoveMethod")
             {
-                var item = acceptableMethods.FirstOrDefault(x => x.Item1 == msg.Content);
+                var item = acceptableMethods.FirstOrDefault(x => x.Method == msg.Target);
                 acceptableMethods.Remove(item);
                 Send(new Message() { Method = "MethodsUpdated"});
             }
@@ -86,8 +96,8 @@ namespace Server
                     return;
                 }
                 var remoteUser = userIDToVRCWS[msg.Target];
-                var item = remoteUser.acceptableMethods.First(x => x.Item1 == msg.Content);
-                if(item==null || item.Item2 && world != remoteUser.world)
+                var item = remoteUser.acceptableMethods.FirstOrDefault(x => x.Method == msg.Method);
+                if(item==null || item.WorldOnly && world != remoteUser.world)
                 {
                     Send(new Message() { Method = "Error", Target = msg.Target, Content = "MethodNotAcepted" });
                     return;
