@@ -11,7 +11,7 @@ using HarmonyLib;
 using System.Security.Cryptography;
 using System.Text;
 
-[assembly: MelonInfo(typeof(VRCWSLibaryMod), "VRCWSLibary", "1.0.2", "Eric van Fandenfart")]
+[assembly: MelonInfo(typeof(VRCWSLibaryMod), "VRCWSLibary", "1.0.3", "Eric van Fandenfart")]
 [assembly: MelonGame]
 
 
