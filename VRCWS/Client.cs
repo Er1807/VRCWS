@@ -1,17 +1,14 @@
 ﻿using MelonLoader;
 using Newtonsoft.Json;
-using System;
-using System.Collections;
 using System.Collections.Generic;
-using WebSocketSharp;
-using VRChatUtilityKit.Utilities;
 using VRCWSLibary;
-using System.Linq;
 using HarmonyLib;
-using System.Security.Cryptography;
-using System.Text;
+using VRChatUtilityKit.Utilities;
+using VRChatUtilityKit.Ui;
+using UnityEngine;
+using System.Threading.Tasks;
 
-[assembly: MelonInfo(typeof(VRCWSLibaryMod), "VRCWSLibary", "1.0.3", "Eric van Fandenfart")]
+[assembly: MelonInfo(typeof(VRCWSLibaryMod), "VRCWSLibary", "1.0.4", "Eric van Fandenfart")]
 [assembly: MelonGame]
 
 
@@ -24,20 +21,27 @@ namespace VRCWSLibary
         public string Method { get; set; }
         public string Target { get; set; }
         public string Content { get; set; }
+        public string Signature { get; set; }
 
         public override string ToString()
         {
-            return $"{Method} - {Target} - {Content}";
+            return $"{Method} - {Target} - {Content} - {Signature}";
+        }
+
+        public T GetContentAs<T>()
+        {
+            return JsonConvert.DeserializeObject<T>(Content);
         }
     }
     public class AcceptedMethod
     {
         public string Method { get; set; }
         public bool WorldOnly { get; set; }
+        public bool SignatureRequired { get; set; }
 
         public override string ToString()
         {
-            return $"{Method} - {WorldOnly}";
+            return $"{Method} - {WorldOnly} - {SignatureRequired}";
         }
     }
 
@@ -45,23 +49,76 @@ namespace VRCWSLibary
     {
         public override void OnApplicationStart()
         {
-            var category = MelonPreferences.CreateCategory("WSConnectionLibary");
+            SecurityContext.LoadKeys();
+
+            var category = MelonPreferences.CreateCategory("VRCWS");
             MelonPreferences_Entry<string> entryURL = category.CreateEntry("Server", "wss://vrcws.er1807.de/VRC");
             MelonPreferences_Entry<bool> entryConnect = category.CreateEntry("Connect", false);
-            entryURL.OnValueChanged += (oldValue, newValue) => { Client.GetClient().Connect(newValue); };
+            entryURL.OnValueChanged += (oldValue, newValue) => { Client.GetClient().connection.Connect(newValue); };
             entryConnect.OnValueChanged += (oldValue, newValue) => {
-                Client.GetClient().retryCount = 0;
-                if (newValue) Client.GetClient().Connect(entryURL.Value);
-                else Client.GetClient().Disconnect();
+                Client.GetClient().connection.retryCount = 0;
+                if (newValue) Client.GetClient().connection.Connect(entryURL.Value);
+                else Client.GetClient().connection.Disconnect();
+            };
+
+
+            if (entryConnect.Value)
+                Client.GetClient().connection.Connect(entryURL.Value);
+
+
+            MelonPreferences_Entry<bool> entrypubKey = category.CreateEntry("Accept Public Key", false);
+            entrypubKey.Value = false;//force value to false on startup
+            entrypubKey.Save();
+            entrypubKey.OnValueChanged += (oldValue, newValue) => {
+                if (newValue) StartAcceptingKey();
+                else StopAcceptingKeys();
             };
 
             HarmonyInstance.Patch(typeof(NetworkManager).GetMethod("OnJoinedRoom"), new HarmonyMethod(typeof(Client).GetMethod("OnJoinedRoom")));
-
-            if (entryConnect.Value)
-                Client.GetClient().Connect(entryURL.Value);
+            VRCUtils.OnUiManagerInit += Init;
         }
 
-        
+        private void Init()
+        {
+            var button = new SingleButton(GameObject.Find("UserInterface/MenuContent/Screens/UserInfo/"),
+                            new Vector3(0, 3), "Send\nPubKey", delegate
+                            {
+                                MelonLogger.Msg($"Sending public key");
+                                string userID = VRCUtils.ActiveUserInUserInfoMenu.id;
+                                SendPubKey(userID);
+                            },
+                            "Send the user youe public key",
+                            "SendPubKeySingleBtn");
+
+            button.gameObject.transform.localScale = new Vector3(0.4f, 0.4f, 0.4f);
+            button.gameObject.transform.localPosition = new Vector3(620, 154, 0);
+
+            MelonLogger.Msg("Buttons sucessfully created");
+        }
+
+        public void StartAcceptingKey()
+        {
+            Client.GetClient().RegisterEvent("SendPubKey", AcceptPublicKey, true, false);
+        }
+
+        public void StopAcceptingKeys()
+        {
+            Client.GetClient().RemoveEvent("SendPubKey");
+        }
+
+        public void SendPubKey(string userID)
+        {
+            Client.GetClient().Send(new Message() { Method = "SendPubKey", Target = userID, Content = SecurityContext.GetPublicKeyAsJsonString() });
+        }
+
+        public void AcceptPublicKey(Message msg)
+        {
+            Task.Run(async () => {
+                await AsyncUtils.YieldToMainThread();
+                UiManager.OpenPopup("Accept PubKey", $"Accept Public key from user {msg.Target}", "Decline", () => { UiManager.ClosePopup(); }, "Accept", () => { SecurityContext.AcceptPubKey(msg.Content, msg.Target); UiManager.ClosePopup(); });
+            });
+            
+        }
     }
 
     public class Client
@@ -75,14 +132,15 @@ namespace VRCWSLibary
             return client;
         }
 
-        public static bool ClientAvailable() => client != null && client.connected;
+        public static bool ClientAvailable() => client != null && client.Connected;
 
-        private static List<Client> allClients = new List<Client>();
+        private static readonly List<Client> allClients = new List<Client>();
 
-        private WebSocket ws;
+        public Connection connection;
+
         public event MessageEvent MessageRecieved;
-        public event ConnectEvent Connected;
-        public bool connected = false;
+        public event ConnectEvent ConnectRecieved;
+        public bool Connected => connection.connected;
         public event MessageEvent ErrorRecieved;
         public event OnlineEvent OnlineRecieved;
         public delegate void MessageEvent(Message message);
@@ -94,71 +152,35 @@ namespace VRCWSLibary
 
         public Client()
         {
+            connection = new Connection(this);
             allClients.Add(this);
-            Connected += () =>
+            ConnectRecieved += () =>
             {
                 foreach (var item in Methods.Keys)
                 {
                     AcceptMethod(item);
                 }
             };
-        }
-
+        }     
         
-
-                
-        private string server;
-        public int retryCount = 0;
-
-        public async void Connect(string server)
-        {
-
-            this.server = server;
-            await AsyncUtils.YieldToMainThread();
-            Disconnect();
-           
-            MelonLogger.Msg($"Connecting to {server}");
-            ws = new WebSocket(server);
-            ws.OnMessage += Recieve;
-            ws.OnError += Reconnect;
-            ws.OnClose += (_, close) => { connected = false;  if (!close.WasClean) Reconnect(null, null); };
-            ws.EmitOnPing = false;
-            ws.OnOpen += (_,_2) => {
-                MelonCoroutines.Start(SetUserID());
-                MelonLogger.Msg($"Connected to {server}");
-            };
-            ws.ConnectAsync();
-            
-        }
 
         public static void OnJoinedRoom()
         {
             foreach (var item in allClients)
             {
-                if (item.connected)
+                if (item.Connected)
                 {
-                    item.SetWorldID();
+                    item.connection.SetWorldID();
                 }
             }
         }
 
-        public void Disconnect()
-        { 
-            MelonLogger.Msg("Disconnecting");
-            connected = false;
-            //AsyncUtils.YieldToMainThread();
-            if(ws != null)
-                ws.Close();
-            
-        }
-
         //https://forum.unity.com/threads/solved-dictionary-of-delegate-such-that-each-value-hold-multiple-methods.506880/
-        public void RegisterEvent(string method, MessageEvent e, bool worldOnly = true)
+        public void RegisterEvent(string method, MessageEvent e, bool worldOnly = true, bool signatureRequired = true)
         {
             MelonLogger.Msg($"Registering Event {method}");
-            AcceptedMethod acceptedMethod = new AcceptedMethod() {Method = method, WorldOnly = worldOnly };
-            MessageEvent EventStored;
-            if (Methods.TryGetValue(acceptedMethod, out EventStored))
+            AcceptedMethod acceptedMethod = new AcceptedMethod() {Method = method, WorldOnly = worldOnly, SignatureRequired = signatureRequired };
+            if (Methods.TryGetValue(acceptedMethod, out MessageEvent EventStored))
             {
                 EventStored += e;
                 Methods[acceptedMethod] = EventStored; // Copy the newly aggregated delegate back into the dictionary.
@@ -167,17 +189,25 @@ namespace VRCWSLibary
             {
                 EventStored += e;
                 Methods.Add(acceptedMethod, EventStored);
-                if (connected)
+                if (Connected)
                     AcceptMethod(acceptedMethod);
             }
         }
+
+        public void RemoveEvent(string method)
+        {
+            AcceptedMethod acceptedMethod = new AcceptedMethod() { Method = method};
+            Methods.Remove(acceptedMethod);
+            RemoveMethod(acceptedMethod);
+        }
+
         private void AcceptMethod(AcceptedMethod method)
         {
-            Send(new Message() { Method = "AcceptMethod", Target = method.Method, Content =method.WorldOnly?"true":"false"  });
+            Send(new Message() { Method = "AcceptMethod", Content = JsonConvert.SerializeObject(method) });
         }
         private void RemoveMethod(AcceptedMethod method)
         {
-            Send(new Message() { Method = "RemoveMethod", Content = method.Method });
+            Send(new Message() { Method = "RemoveMethod", Content = JsonConvert.SerializeObject(method) });
         }
 
         public void IsUserOnline(string userID)
@@ -187,101 +217,27 @@ namespace VRCWSLibary
 
         public void Send(Message msg)
         {
-            Send(JsonConvert.SerializeObject(msg));
-        }
-        private async void Send(string msg)
-        {
-            await AsyncUtils.YieldToMainThread();
-            if (ws.IsAlive)
-            {
-                ws.Send(msg);
-            }
-            else
-            {
-                MelonLogger.Msg("Couldnt send "+msg);
-            }
-            
-        }
-        public IEnumerator SetUserID()
-        {
-            while (VRCPlayer.field_Internal_Static_VRCPlayer_0 == null || VRCPlayer.field_Internal_Static_VRCPlayer_0.prop_String_2 == null)
-                yield return null;
-
-            string userID = VRCPlayer.field_Internal_Static_VRCPlayer_0.prop_String_2;
-            
-            
-
-            MelonLogger.Msg("Connecting as " + userID);
-            Send(new Message() { Method = "StartConnection", Content = userID });
-            SetWorldID();
+            connection.Send(msg);
         }
 
-        public void SetWorldID()
+        public void OnMessage(Message msg)
         {
-
-            //https://github.com/loukylor/VRC-Mods/blob/main/VRChatUtilityKit/Utilities/DataUtils.cs
-            SHA256 sha256 = SHA256.Create();
-            string hashedWorldID = Convert.ToBase64String(sha256.ComputeHash(Encoding.UTF8.GetBytes(RoomManager.prop_String_0)));
-            Send(new Message() { Method = "SetWorld", Content = hashedWorldID });
-        }
-
-        private void Recieve(object sender, MessageEventArgs e)
-        {
-            MelonLogger.Msg(e.Data);
-            Message msg = JsonConvert.DeserializeObject<Message>(e.Data);
             MessageRecieved?.Invoke(msg);
-            if (msg.Method == "OnlineStatus")
-            {
-                OnlineRecieved?.Invoke(msg.Target, msg.Content == "Online");
-            }
-            else if (msg.Method == "Error")
-            {
-                ErrorRecieved?.Invoke(msg);
-            }
-            else if (msg.Method == "MethodsUpdated")
-            {
-                //Nothing
-            }
-            else if (msg.Method == "WorldUpdated")
-            {
-                //Nothing
-            }
-            else if (msg.Method == "Connected")
-            {
-                connected = true;
-                Connected?.Invoke();
-            }
-            else
-            {
-                var item = Methods.Keys.FirstOrDefault(x => x.Method == msg.Method);
-                if (item != null)
-                    Methods[item]?.Invoke(msg);
-            }
         }
 
-        private void Reconnect(object sender, EventArgs e)
+        internal void OnOnline(string user, bool online)
         {
-            retryCount += 1;
-            connected = false;
-            if (retryCount >= 10)
-            {
-                MelonLogger.Msg("RetryCount to high. Reconnect from the Setting and/or choose a new Server");
-                return;
-            }
-            MelonLogger.Msg("Retrying to establish connection");
-            MelonCoroutines.Start(RetryConnect(retryCount * 10));
+            OnlineRecieved?.Invoke(user, online);
         }
-        public IEnumerator RetryConnect(int waititt)
+
+        internal void OnError(Message msg)
         {
-            while (waititt == 0)
-            {
-                waititt -= 1;
-                yield return null;
-            }
-            if(!connected)
-                Connect(server);
-
+            ErrorRecieved?.Invoke(msg);
         }
 
+        internal void OnConnected()
+        {
+            ConnectRecieved?.Invoke();
+        }
     }
 }

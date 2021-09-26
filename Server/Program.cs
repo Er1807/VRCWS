@@ -17,23 +17,29 @@ namespace Server
             public string Method { get; set; }
             public string Target { get; set; }
             public string Content { get; set; }
+            public string Signature { get; set; }
 
             public override string ToString()
             {
-                return $"{Method} - {Target} - {Content}";
+                return $"{Method} - {Target} - {Content} - {Signature}";
+            }
+            public T GetContentAs<T>()
+            {
+                return JsonConvert.DeserializeObject<T>(Content);
             }
         }
 
         public class AcceptedMethod
-        {
-            public string Method { get; set; }
-            public bool WorldOnly { get; set; }
+    {
+        public string Method { get; set; }
+        public bool WorldOnly { get; set; }
+        public bool SignatureRequired { get; set; }
 
-            public override string ToString()
-            {
-                return $"{Method} - {WorldOnly}";
-            }
+        public override string ToString()
+        {
+            return $"{Method} - {WorldOnly} - {SignatureRequired}";
         }
+    }
 
         public static Dictionary<string, VRCWS> userIDToVRCWS = new Dictionary<string, VRCWS>();
 
@@ -70,12 +76,21 @@ namespace Server
             }
             else if (msg.Method == "AcceptMethod")
             {
-                acceptableMethods.Add(new AcceptedMethod() { Method = msg.Target, WorldOnly = msg.Content=="true"});
+                var acceptedMethod = msg.GetContentAs<AcceptedMethod>();
+                if (acceptableMethods.Any(x => x.Method == msg.Target))
+                {
+                    Send(new Message() { Method = "Error" , Content = "MethodAlreadyExisted"});
+                    return;
+                }
+                
+                acceptableMethods.Add(acceptedMethod);
                 Send(new Message() { Method = "MethodsUpdated" });
+                
             }
             else if(msg.Method == "RemoveMethod")
             {
-                var item = acceptableMethods.FirstOrDefault(x => x.Method == msg.Target);
+                var acceptedMethod = msg.GetContentAs<AcceptedMethod>();
+                var item = acceptableMethods.FirstOrDefault(x => x.Method ==acceptedMethod.Method);
                 acceptableMethods.Remove(item);
                 Send(new Message() { Method = "MethodsUpdated"});
             }
@@ -91,20 +106,28 @@ namespace Server
             } 
             else
             {
-                if (!userIDToVRCWS.ContainsKey(msg.Target)) {
-                    Send(new Message() { Method = "Error", Target = msg.Target, Content = "UserOffline" });
-                    return;
-                }
-                var remoteUser = userIDToVRCWS[msg.Target];
-                var item = remoteUser.acceptableMethods.FirstOrDefault(x => x.Method == msg.Method);
-                if(item==null || item.WorldOnly && world != remoteUser.world)
-                {
-                    Send(new Message() { Method = "Error", Target = msg.Target, Content = "MethodNotAcepted" });
-                    return;
-                }
-                msg.Target = userID;
-                remoteUser.Send(msg);
+                ProxyMessage(msg);
             }
+        }
+
+        private void ProxyMessage(Message msg)
+        {
+            if (!userIDToVRCWS.ContainsKey(msg.Target))
+            {
+                Send(new Message() { Method = "Error", Target = msg.Target, Content = "UserOffline" });
+                return;
+            }
+            var remoteUser = userIDToVRCWS[msg.Target];
+            var item = remoteUser.acceptableMethods.FirstOrDefault(x => x.Method == msg.Method);
+            if (item == null
+                || item.WorldOnly && world != remoteUser.world
+                || item.SignatureRequired && String.IsNullOrWhiteSpace(msg.Signature))
+            {
+                Send(new Message() { Method = "Error", Target = msg.Target, Content = "MethodNotAcepted" });
+                return;
+            }
+            msg.Target = userID;
+            remoteUser.Send(msg);
         }
 
         protected override void OnClose(CloseEventArgs e)
