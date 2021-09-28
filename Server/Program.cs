@@ -56,7 +56,6 @@ namespace Server
 
         protected override void OnMessage(MessageEventArgs e)
         {
-            Program.RecievedMessages.Inc();
             Message msg;
             try
             {
@@ -65,8 +64,10 @@ namespace Server
             catch (Exception)
             {
                 Send(new Message() { Method = "Error", Content = "Invalid Message" });
+                Program.RecievedMessages.WithLabels("Invalid").Inc();
                 return;
             }
+            Program.RecievedMessages.WithLabels(msg.Method).Inc();
             Console.WriteLine($"<< {userID}: {msg}");
             if(msg.Method == "StartConnection")
             {
@@ -101,7 +102,8 @@ namespace Server
                 
                 acceptableMethods.Add(acceptedMethod);
                 Send(new Message() { Method = "MethodsUpdated" });
-                
+                UpdateStats();
+
             }
             else if(msg.Method == "RemoveMethod")
             {
@@ -109,6 +111,7 @@ namespace Server
                 var item = acceptableMethods.FirstOrDefault(x => x.Method ==acceptedMethod.Method);
                 acceptableMethods.Remove(item);
                 Send(new Message() { Method = "MethodsUpdated"});
+                UpdateStats();
             }
             else if (msg.Method == "IsOnline")
             {
@@ -128,7 +131,7 @@ namespace Server
 
         private void ProxyMessage(Message msg)
         {
-            Program.ProxyMessagesAttampt.Inc();
+            Program.ProxyMessagesAttempt.WithLabels(msg.Method).Inc();
             if (!userIDToVRCWS.ContainsKey(msg.Target))
             {
                 Send(new Message() { Method = "Error", Target = msg.Target, Content = "UserOffline" });
@@ -145,7 +148,7 @@ namespace Server
             }
             msg.Target = userID;
             remoteUser.Send(msg);
-            Program.ProxyMessages.Inc();
+            Program.ProxyMessages.WithLabels(msg.Method).Inc();
         }
 
         protected override void OnClose(CloseEventArgs e)
@@ -166,7 +169,7 @@ namespace Server
 
         public void Send(Message msg)
         {
-            Program.SendMessages.Inc();
+            Program.SendMessages.WithLabels(msg.Method).Inc();
             Console.WriteLine($">> {msg}");
             Send(JsonConvert.SerializeObject(msg));
         }
@@ -175,6 +178,21 @@ namespace Server
         {
             Program.ActiveWS.Set(Sessions.Count);
             Program.CurrentUsers.Set(userIDToVRCWS.Count);
+
+            Dictionary<string, int> usersPerMethod = new Dictionary<string, int>();
+            foreach (var item in userIDToVRCWS)
+            {
+                foreach (var item2 in item.Value.acceptableMethods)
+                {
+                    usersPerMethod[item2.Method] = usersPerMethod.GetValueOrDefault(item2.Method, 0) + 1;
+                }
+            }
+
+            foreach (var item in usersPerMethod)
+            {
+                Program.ActiveMethods.WithLabels(item.Key).Set(item.Value);
+            }
+
         }
     }
 
@@ -183,10 +201,11 @@ namespace Server
 
         public static readonly Gauge ActiveWS = Metrics.CreateGauge("vrcws_active_ws_current", "Active web sockets");
         public static readonly Gauge CurrentUsers = Metrics.CreateGauge("vrcws_active_users_current", "Active users");
-        public static readonly Counter SendMessages = Metrics.CreateCounter("vrcws_send_messages", "Messages send");
-        public static readonly Counter RecievedMessages = Metrics.CreateCounter("vrcws_recieved_messages", "Messages recieved");
-        public static readonly Counter ProxyMessages = Metrics.CreateCounter("vrcws_proxy_messages", "Messages proxied");
-        public static readonly Counter ProxyMessagesAttampt = Metrics.CreateCounter("vrcws_proxy_messages_attempt", "Messages proxied attemt");
+        public static readonly Counter SendMessages = Metrics.CreateCounter("vrcws_send_messages", "Messages send", new CounterConfiguration { LabelNames = new[] { "method" } });
+        public static readonly Counter RecievedMessages = Metrics.CreateCounter("vrcws_recieved_messages", "Messages recieved", new CounterConfiguration { LabelNames = new[] { "method" } });
+        public static readonly Counter ProxyMessages = Metrics.CreateCounter("vrcws_proxy_messages", "Messages proxied", new CounterConfiguration { LabelNames = new[] { "method" } });
+        public static readonly Counter ProxyMessagesAttempt = Metrics.CreateCounter("vrcws_proxy_messages_attempt", "Messages proxied attempt", new CounterConfiguration { LabelNames = new[] { "method" } });
+        public static readonly Gauge ActiveMethods = Metrics.CreateGauge("vrcws_active_users_per_method", "Active Methods per User", new GaugeConfiguration { LabelNames = new[] { "method" }});
 
         public static void Main(string[] args)
         {
@@ -196,7 +215,6 @@ namespace Server
                 eventArgs.Cancel = true;
                 exitEvent.Set();
             };
-
             var wssv = new WebSocketServer("ws://0.0.0.0:8080");
             var server = new MetricServer(9100);
             wssv.AddWebSocketService<VRCWS>("/VRC");
