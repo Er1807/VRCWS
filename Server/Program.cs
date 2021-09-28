@@ -22,7 +22,7 @@ namespace Server
 
             public override string ToString()
             {
-                return $"{Method} - {Target} - {Content} - {Signature}";
+                return $"{Method} - {Target} - {Content}";
             }
             public T GetContentAs<T>()
             {
@@ -67,7 +67,7 @@ namespace Server
                 Send(new Message() { Method = "Error", Content = "Invalid Message" });
                 return;
             }
-            Console.WriteLine($"<< {msg}");
+            Console.WriteLine($"<< {userID}: {msg}");
             if(msg.Method == "StartConnection")
             {
                 if (userIDToVRCWS.ContainsKey(msg.Content)){
@@ -128,6 +128,7 @@ namespace Server
 
         private void ProxyMessage(Message msg)
         {
+            Program.ProxyMessagesAttampt.Inc();
             if (!userIDToVRCWS.ContainsKey(msg.Target))
             {
                 Send(new Message() { Method = "Error", Target = msg.Target, Content = "UserOffline" });
@@ -144,6 +145,7 @@ namespace Server
             }
             msg.Target = userID;
             remoteUser.Send(msg);
+            Program.ProxyMessages.Inc();
         }
 
         protected override void OnClose(CloseEventArgs e)
@@ -184,6 +186,7 @@ namespace Server
         public static readonly Counter SendMessages = Metrics.CreateCounter("vrcws_send_messages", "Messages send");
         public static readonly Counter RecievedMessages = Metrics.CreateCounter("vrcws_recieved_messages", "Messages recieved");
         public static readonly Counter ProxyMessages = Metrics.CreateCounter("vrcws_proxy_messages", "Messages proxied");
+        public static readonly Counter ProxyMessagesAttampt = Metrics.CreateCounter("vrcws_proxy_messages_attempt", "Messages proxied attemt");
 
         public static void Main(string[] args)
         {
