@@ -216,6 +216,7 @@ namespace Server
                 exitEvent.Set();
             };
             var wssv = new WebSocketServer("ws://0.0.0.0:8080");
+            wssv.Log.Output = (_, __) => { }; // disable log
             var server = new MetricServer(9100);
             wssv.AddWebSocketService<VRCWS>("/VRC");
             wssv.AllowForwardedRequest = true;
