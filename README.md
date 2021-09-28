@@ -9,6 +9,8 @@ When connecting to any world a hash of the world instance is send to the server.
 
 Also unless opt-in events are only forwarded to event handlers if the are trusted. This works by public key signing. 
 
+## Trust another user
+
 To trust a new client activate "Accept public key" (disabled on startup)
 
 ![image](https://user-images.githubusercontent.com/20169013/134819167-16e66e2a-3907-45ec-9c76-a690096a21cd.png)
@@ -19,8 +21,14 @@ Then ask the other person to send their publik key(both players need to be in th
 
 Afterwards you need to accept their key. When you are done you should disable the setting again
 
-![image](https://user-images.githubusercontent.com/20169013/134819221-abd1324c-5e58-43db-a363-c03e0faba54c.png)
+![134819221-abd1324c-5e58-43db-a363-c03e0faba54c](https://user-images.githubusercontent.com/20169013/135122721-72f417d8-d26c-4e64-8ae6-22b739ab186c.png)
 
+Walkthrough
+
+https://user-images.githubusercontent.com/20169013/135122563-bf73232f-c5b3-48c7-806e-f2e3ebf2795b.mp4
+
+
+## Advanced (use your own server)
 
 It is possible to create a new Instance of Client and therefore connect to another server. Also the main server for the default client can be changed.
 
