@@ -8,7 +8,7 @@ using VRChatUtilityKit.Ui;
 using UnityEngine;
 using System.Threading.Tasks;
 
-[assembly: MelonInfo(typeof(VRCWSLibaryMod), "VRCWSLibary", "1.0.6", "Eric van Fandenfart")]
+[assembly: MelonInfo(typeof(VRCWSLibaryMod), "VRCWSLibary", "1.0.7", "Eric van Fandenfart")]
 [assembly: MelonGame]
 [assembly: MelonAdditionalDependencies("VRChatUtilityKit")]
 
@@ -92,7 +92,7 @@ namespace VRCWSLibary
                             "SendPubKeySingleBtn");
 
             button.gameObject.transform.localScale = new Vector3(0.4f, 0.4f, 0.4f);
-            button.gameObject.transform.localPosition = new Vector3(620, 154, 0);
+            button.gameObject.transform.localPosition = new Vector3(620, 75, 0);
 
             MelonLogger.Msg("Buttons sucessfully created");
         }
