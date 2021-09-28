@@ -7,6 +7,10 @@ using VRChatUtilityKit.Utilities;
 using VRChatUtilityKit.Ui;
 using UnityEngine;
 using System.Threading.Tasks;
+using UnityEngine.UI;
+using UnhollowerRuntimeLib;
+using UnityEngine.Events;
+using System;
 
 [assembly: MelonInfo(typeof(VRCWSLibaryMod), "VRCWSLibary", "1.0.7", "Eric van Fandenfart")]
 [assembly: MelonGame]
@@ -81,21 +85,31 @@ namespace VRCWSLibary
 
         private void Init()
         {
-            var button = new SingleButton(GameObject.Find("UserInterface/MenuContent/Screens/UserInfo/"),
-                            new Vector3(0, 3), "Send\nPubKey", delegate
-                            {
-                                MelonLogger.Msg($"Sending public key");
-                                string userID = VRCUtils.ActiveUserInUserInfoMenu.id;
-                                SendPubKey(userID);
-                            },
-                            "Send the user youe public key",
-                            "SendPubKeySingleBtn");
+            var baseUIElement = GameObject.Find("UserInterface/MenuContent/Screens/UserInfo/Buttons/RightSideButtons/RightUpperButtonColumn/PlaylistsButton").gameObject;
 
-            button.gameObject.transform.localScale = new Vector3(0.4f, 0.4f, 0.4f);
-            button.gameObject.transform.localPosition = new Vector3(620, 75, 0);
+            var gameObject = GameObject.Instantiate(baseUIElement, baseUIElement.transform.parent, true);
+            gameObject.name = "Send_PubKey";
+
+            //rect = gameObject.GetComponent<RectTransform>();
+            //rect.anchoredPosition = position;
+
+
+            var uitext = gameObject.GetComponentInChildren<Text>();
+            uitext.text = "Send Pub Key";
+
+            var button = gameObject.GetComponent<Button>();
+            button.onClick = new Button.ButtonClickedEvent();
+            var action = new Action(delegate (){
+                MelonLogger.Msg($"Sending public key");
+                string userID = VRCUtils.ActiveUserInUserInfoMenu.id;
+                SendPubKey(userID);
+            });
+            button.onClick.AddListener(DelegateSupport.ConvertDelegate<UnityAction>(action));
+
 
             MelonLogger.Msg("Buttons sucessfully created");
         }
+
 
         public void StartAcceptingKey()
         {
