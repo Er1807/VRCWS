@@ -12,7 +12,7 @@ using UnhollowerRuntimeLib;
 using UnityEngine.Events;
 using System;
 
-[assembly: MelonInfo(typeof(VRCWSLibaryMod), "VRCWSLibary", "1.0.7", "Eric van Fandenfart")]
+[assembly: MelonInfo(typeof(VRCWSLibaryMod), "VRCWSLibary", "1.0.8", "Eric van Fandenfart")]
 [assembly: MelonGame]
 [assembly: MelonAdditionalDependencies("VRChatUtilityKit")]
 
@@ -89,10 +89,6 @@ namespace VRCWSLibary
 
             var gameObject = GameObject.Instantiate(baseUIElement, baseUIElement.transform.parent, true);
             gameObject.name = "Send_PubKey";
-
-            //rect = gameObject.GetComponent<RectTransform>();
-            //rect.anchoredPosition = position;
-
 
             var uitext = gameObject.GetComponentInChildren<Text>();
             uitext.text = "Send Pub Key";
