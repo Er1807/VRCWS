@@ -1,4 +1,5 @@
 ﻿using Newtonsoft.Json;
+using Prometheus;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -48,9 +49,24 @@ namespace Server
 
         public List<AcceptedMethod> acceptableMethods = new List<AcceptedMethod>();
 
+        protected override void OnOpen()
+        {
+            UpdateStats();
+        }
+
         protected override void OnMessage(MessageEventArgs e)
         {
-            Message msg =  JsonConvert.DeserializeObject<Message>(e.Data);
+            Program.RecievedMessages.Inc();
+            Message msg;
+            try
+            {
+                msg = JsonConvert.DeserializeObject<Message>(e.Data);
+            }
+            catch (Exception)
+            {
+                Send(new Message() { Method = "Error", Content = "Invalid Message" });
+                return;
+            }
             Console.WriteLine($"<< {msg}");
             if(msg.Method == "StartConnection")
             {
@@ -135,6 +151,7 @@ namespace Server
             if (userID == null) return;
             Console.WriteLine($"User {userID} dissconected");
                 userIDToVRCWS.Remove(userID);
+            UpdateStats();
         }
 
         protected override void OnError(ErrorEventArgs e)
@@ -142,17 +159,32 @@ namespace Server
             if (userID == null) return;
             Console.WriteLine($"User {userID} errored");
             userIDToVRCWS.Remove(userID);
+            UpdateStats();
         }
 
         public void Send(Message msg)
         {
+            Program.SendMessages.Inc();
             Console.WriteLine($">> {msg}");
             Send(JsonConvert.SerializeObject(msg));
+        }
+
+        public void UpdateStats()
+        {
+            Program.ActiveWS.Set(Sessions.Count);
+            Program.CurrentUsers.Set(userIDToVRCWS.Count);
         }
     }
 
     public class Program
     {
+
+        public static readonly Gauge ActiveWS = Metrics.CreateGauge("vrcws_active_ws_current", "Active web sockets");
+        public static readonly Gauge CurrentUsers = Metrics.CreateGauge("vrcws_active_users_current", "Active users");
+        public static readonly Counter SendMessages = Metrics.CreateCounter("vrcws_send_messages", "Messages send");
+        public static readonly Counter RecievedMessages = Metrics.CreateCounter("vrcws_recieved_messages", "Messages recieved");
+        public static readonly Counter ProxyMessages = Metrics.CreateCounter("vrcws_proxy_messages", "Messages proxied");
+
         public static void Main(string[] args)
         {
 
@@ -163,13 +195,25 @@ namespace Server
             };
 
             var wssv = new WebSocketServer("ws://0.0.0.0:8080");
+            var server = new MetricServer(9100);
             wssv.AddWebSocketService<VRCWS>("/VRC");
             wssv.AllowForwardedRequest = true;
-            
+
+            Console.WriteLine("Starting Metric service");
+            server.Start();
+            Console.WriteLine("Starting WS Server");
             wssv.Start();
             Console.WriteLine("Listening");
+
+
             exitEvent.WaitOne();
             wssv.Stop();
+            server.Stop();
+
+
+
+            
+
         }
     }
 }
