@@ -87,7 +87,8 @@ namespace VRCWSLibary
         public async void Send(string msg)
         {
             await AsyncUtils.YieldToMainThread();
-            if (ws.IsAlive)
+            
+            if (ws != null && ws.IsAlive)
             {
                 ws.Send(msg);
             }

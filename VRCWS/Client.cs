@@ -8,8 +8,9 @@ using VRChatUtilityKit.Ui;
 using UnityEngine;
 using System.Threading.Tasks;
 
-[assembly: MelonInfo(typeof(VRCWSLibaryMod), "VRCWSLibary", "1.0.4", "Eric van Fandenfart")]
+[assembly: MelonInfo(typeof(VRCWSLibaryMod), "VRCWSLibary", "1.0.6", "Eric van Fandenfart")]
 [assembly: MelonGame]
+[assembly: MelonAdditionalDependencies("VRChatUtilityKit")]
 
 
 namespace VRCWSLibary
@@ -25,7 +26,7 @@ namespace VRCWSLibary
 
         public override string ToString()
         {
-            return $"{Method} - {Target} - {Content} - {Signature}";
+            return $"{Method} - {Target} - {Content}";
         }
 
         public T GetContentAs<T>()
@@ -53,7 +54,7 @@ namespace VRCWSLibary
 
             var category = MelonPreferences.CreateCategory("VRCWS");
             MelonPreferences_Entry<string> entryURL = category.CreateEntry("Server", "wss://vrcws.er1807.de/VRC");
-            MelonPreferences_Entry<bool> entryConnect = category.CreateEntry("Connect", false);
+            MelonPreferences_Entry<bool> entryConnect = category.CreateEntry("Connect", true);
             entryURL.OnValueChanged += (oldValue, newValue) => { Client.GetClient().connection.Connect(newValue); };
             entryConnect.OnValueChanged += (oldValue, newValue) => {
                 Client.GetClient().connection.retryCount = 0;

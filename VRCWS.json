@@ -11,6 +11,7 @@
     "Library", "Network", "Events"
   ],
   "requirements": [
+    "[VRChatUtilityKit](https://github.com/loukylor/VRC-Mods/tree/main/VRChatUtilityKit)"
   ],
   "downloadlink": "https://github.com/Er1807/VRCWS/releases/download/v1.0.4/VRCWSLibary.dll",
   "sourcelink": "https://github.com/Er1807/VRCWS",
