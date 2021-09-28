@@ -23,7 +23,7 @@ Afterwards you need to accept their key. When you are done you should disable th
 
 ![134819221-abd1324c-5e58-43db-a363-c03e0faba54c](https://user-images.githubusercontent.com/20169013/135122721-72f417d8-d26c-4e64-8ae6-22b739ab186c.png)
 
-Walkthrough
+Walkthrough (as this is only a libary the end text chat is another mod [TextChat](https://github.com/Er1807/VRCTextChat))
 
 https://user-images.githubusercontent.com/20169013/135122563-bf73232f-c5b3-48c7-806e-f2e3ebf2795b.mp4
 
