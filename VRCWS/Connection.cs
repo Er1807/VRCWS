@@ -151,6 +151,14 @@ namespace VRCWSLibary
                 connected = true;
                 Client.OnConnected();
             }
+            else if (msg.Method == "MethodAccept")
+            {
+                Client.OnMethodCheckResponseRecieved(msg.Content, msg.Target, true);
+            }
+            else if (msg.Method == "MethodDecline")
+            {
+                Client.OnMethodCheckResponseRecieved(msg.Content, msg.Target, false);
+            }
             else
             {
                 HandleCustomEvent(msg);

@@ -154,9 +154,12 @@ namespace VRCWSLibary
         public bool Connected => connection.connected;
         public event MessageEvent ErrorRecieved;
         public event OnlineEvent OnlineRecieved;
+        //This does not mean that also the signature is trusted. the server doesnt know what is trusted
+        public event MethodCheckEvent MethodCheckResponseRecieved;
         public delegate void MessageEvent(Message message);
         public delegate void ConnectEvent();
         public delegate void OnlineEvent(string userID, bool online);
+        public delegate void MethodCheckEvent(string method, string userID, bool accept);
 
         public Dictionary<AcceptedMethod, MessageEvent> Methods = new Dictionary<AcceptedMethod, MessageEvent>();
 
@@ -225,6 +228,10 @@ namespace VRCWSLibary
         {
             Send(new Message() { Method = "IsOnline", Target = userID });
         }
+        public void DoesUserAcceptMethod(string userID, string method)
+        {
+            Send(new Message() { Method = "DoesUserAcceptMethod", Target = userID, Content=method });
+        }
 
         public void Send(Message msg)
         {
@@ -249,6 +256,10 @@ namespace VRCWSLibary
         internal void OnConnected()
         {
             ConnectRecieved?.Invoke();
+        }
+        internal void OnMethodCheckResponseRecieved(string method, string user, bool accept)
+        {
+            MethodCheckResponseRecieved?.Invoke(method, user, accept);
         }
     }
 }
