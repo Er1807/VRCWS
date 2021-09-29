@@ -31,16 +31,16 @@ namespace Server
         }
 
         public class AcceptedMethod
-    {
-        public string Method { get; set; }
-        public bool WorldOnly { get; set; }
-        public bool SignatureRequired { get; set; }
-
-        public override string ToString()
         {
-            return $"{Method} - {WorldOnly} - {SignatureRequired}";
+            public string Method { get; set; }
+            public bool WorldOnly { get; set; }
+            public bool SignatureRequired { get; set; }
+
+            public override string ToString()
+            {
+                return $"{Method} - {WorldOnly} - {SignatureRequired}";
+            }
         }
-    }
 
         public static Dictionary<string, VRCWS> userIDToVRCWS = new Dictionary<string, VRCWS>();
 
@@ -122,7 +122,18 @@ namespace Server
                 {
                     Send(new Message() { Method = "OnlineStatus", Target = msg.Target, Content = "Offline" });
                 }
-            } 
+            }
+            else if (msg.Method == "DoesUserAcceptMethod")
+            {
+                if (ProxyRequestValid(msg))
+                {
+                    Send(new Message() { Method = "MethodAccept", Target = msg.Target, Content = msg.Content });
+                }
+                else
+                {
+                    Send(new Message() { Method = "MethodDecline", Target = msg.Target, Content = msg.Content });
+                }
+            }
             else
             {
                 ProxyMessage(msg);
@@ -139,9 +150,7 @@ namespace Server
             }
             var remoteUser = userIDToVRCWS[msg.Target];
             var item = remoteUser.acceptableMethods.FirstOrDefault(x => x.Method == msg.Method);
-            if (item == null
-                || item.WorldOnly && world != remoteUser.world
-                || item.SignatureRequired && String.IsNullOrWhiteSpace(msg.Signature))
+            if (ProxyRequestValid(msg))
             {
                 Send(new Message() { Method = "Error", Target = msg.Target, Content = "MethodNotAcepted" });
                 return;
@@ -149,6 +158,24 @@ namespace Server
             msg.Target = userID;
             remoteUser.Send(msg);
             Program.ProxyMessages.WithLabels(msg.Method).Inc();
+        }
+
+        private bool ProxyRequestValid(Message msg)
+        {
+            if (!userIDToVRCWS.ContainsKey(msg.Target))
+            {
+                return false;
+            }
+            var remoteUser = userIDToVRCWS[msg.Target];
+            var item = remoteUser.acceptableMethods.FirstOrDefault(x => x.Method == msg.Method);
+            if (item == null
+                || item.WorldOnly && world != remoteUser.world
+                || item.SignatureRequired && String.IsNullOrWhiteSpace(msg.Signature))
+            {
+                return false;
+            }
+
+            return true;
         }
 
         protected override void OnClose(CloseEventArgs e)
