@@ -12,7 +12,7 @@ using UnhollowerRuntimeLib;
 using UnityEngine.Events;
 using System;
 
-[assembly: MelonInfo(typeof(VRCWSLibaryMod), "VRCWSLibary", "1.0.8", "Eric van Fandenfart")]
+[assembly: MelonInfo(typeof(VRCWSLibaryMod), "VRCWSLibary", "1.0.9", "Eric van Fandenfart")]
 [assembly: MelonGame]
 [assembly: MelonAdditionalDependencies("VRChatUtilityKit")]
 
