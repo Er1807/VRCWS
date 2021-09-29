@@ -25,7 +25,7 @@ Afterwards you need to accept their key. When you are done you should disable th
 
 Walkthrough (as this is only a libary the end text chat is another mod [TextChat](https://github.com/Er1807/VRCTextChat))
 
-https://user-images.githubusercontent.com/20169013/135122563-bf73232f-c5b3-48c7-806e-f2e3ebf2795b.mp4
+https://user-images.githubusercontent.com/20169013/135313343-8fce61bd-5b33-424e-a778-a47f6ea8eee5.mp4
 
 
 ## Advanced (use your own server)
