@@ -1,7 +1,7 @@
 {
   "_id": 263,
   "name": "VRCWSLibary",
-  "modversion": "1.0.9",
+  "modversion": "1.0.10",
   "vrchatversion": "1133",
   "loaderversion": "v0.4.3 Open-Beta",
   "modtype": "Mod",
@@ -13,8 +13,8 @@
   "requirements": [
     "[VRChatUtilityKit](https://github.com/loukylor/VRC-Mods/tree/main/VRChatUtilityKit)"
   ],
-  "downloadlink": "https://github.com/Er1807/VRCWS/releases/download/v1.0.9/VRCWSLibary.dll",
+  "downloadlink": "https://github.com/Er1807/VRCWS/releases/download/1.0.10/VRCWSLibary.dll",
   "sourcelink": "https://github.com/Er1807/VRCWS",
-  "changelog": "Made button look nice",
+  "changelog": "Made button look nice\nAdded timestamp to signature",
   "embedcolor": "7F60CA"
 }
