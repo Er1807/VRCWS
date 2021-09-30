@@ -70,9 +70,9 @@ namespace Server
             }
             Program.RecievedMessages.WithLabels(msg.Method).Inc();
             Console.WriteLine($"<< {userID}: {msg}");
-            if(msg.Method == "StartConnection")
+            if (msg.Method == "StartConnection")
             {
-                if (userIDToVRCWS.ContainsKey(msg.Content)){
+                if (userIDToVRCWS.ContainsKey(msg.Content)) {
                     Send(new Message() { Method = "Error", Content = "AlreadyConnected" });
                     return;
                 }
@@ -97,26 +97,26 @@ namespace Server
                 var acceptedMethod = msg.GetContentAs<AcceptedMethod>();
                 if (acceptableMethods.Any(x => x.Method == msg.Target))
                 {
-                    Send(new Message() { Method = "Error" , Content = "MethodAlreadyExisted"});
+                    Send(new Message() { Method = "Error", Content = "MethodAlreadyExisted" });
                     return;
                 }
-                
+
                 acceptableMethods.Add(acceptedMethod);
                 Send(new Message() { Method = "MethodsUpdated" });
                 UpdateStats();
 
             }
-            else if(msg.Method == "RemoveMethod")
+            else if (msg.Method == "RemoveMethod")
             {
                 var acceptedMethod = msg.GetContentAs<AcceptedMethod>();
-                var item = acceptableMethods.FirstOrDefault(x => x.Method ==acceptedMethod.Method);
+                var item = acceptableMethods.FirstOrDefault(x => x.Method == acceptedMethod.Method);
                 acceptableMethods.Remove(item);
-                Send(new Message() { Method = "MethodsUpdated"});
+                Send(new Message() { Method = "MethodsUpdated" });
                 UpdateStats();
             }
             else if (msg.Method == "IsOnline")
             {
-                if (userIDToVRCWS.ContainsKey(msg.Target)){
+                if (userIDToVRCWS.ContainsKey(msg.Target)) {
                     Send(new Message() { Method = "OnlineStatus", Target = msg.Target, Content = "Online" });
                 }
                 else
@@ -126,7 +126,7 @@ namespace Server
             }
             else if (msg.Method == "DoesUserAcceptMethod")
             {
-                if (ProxyRequestValid(msg))
+                if (!ProxyRequestValid(msg))
                 {
                     Send(new Message() { Method = "MethodAccept", Target = msg.Target, Content = msg.Content });
                 }
@@ -151,7 +151,7 @@ namespace Server
             }
             var remoteUser = userIDToVRCWS[msg.Target];
             var item = remoteUser.acceptableMethods.FirstOrDefault(x => x.Method == msg.Method);
-            if (ProxyRequestValid(msg))
+            if (!ProxyRequestValid(msg))
             {
                 Send(new Message() { Method = "Error", Target = msg.Target, Content = "MethodNotAcepted" });
                 return;
@@ -183,7 +183,7 @@ namespace Server
         {
             if (userID == null) return;
             Console.WriteLine($"User {userID} dissconected");
-                userIDToVRCWS.Remove(userID);
+            userIDToVRCWS.Remove(userID);
             UpdateStats();
         }
 
@@ -233,7 +233,7 @@ namespace Server
         public static readonly Counter RecievedMessages = Metrics.CreateCounter("vrcws_recieved_messages", "Messages recieved", new CounterConfiguration { LabelNames = new[] { "method" } });
         public static readonly Counter ProxyMessages = Metrics.CreateCounter("vrcws_proxy_messages", "Messages proxied", new CounterConfiguration { LabelNames = new[] { "method" } });
         public static readonly Counter ProxyMessagesAttempt = Metrics.CreateCounter("vrcws_proxy_messages_attempt", "Messages proxied attempt", new CounterConfiguration { LabelNames = new[] { "method" } });
-        public static readonly Gauge ActiveMethods = Metrics.CreateGauge("vrcws_active_users_per_method", "Active Methods per User", new GaugeConfiguration { LabelNames = new[] { "method" }});
+        public static readonly Gauge ActiveMethods = Metrics.CreateGauge("vrcws_active_users_per_method", "Active Methods per User", new GaugeConfiguration { LabelNames = new[] { "method" } });
 
         public static void Main(string[] args)
         {
@@ -255,15 +255,33 @@ namespace Server
             wssv.Start();
             Console.WriteLine("Listening");
 
+            Console.WriteLine("Starting Cleanup Task");
+            Task.Run(CleanUpTask);
 
             exitEvent.WaitOne();
             wssv.Stop();
             server.Stop();
 
-
-
-            
-
         }
+
+        private static void CleanUpTask()
+        {
+            while (true)
+            {
+                List<string> ToClean = new List<string>();
+                foreach (var item in VRCWS.userIDToVRCWS)
+                {
+                    if (item.Value.State == WebSocketState.Closed || item.Value.State == WebSocketState.Closing)
+                        ToClean.Add(item.Key);
+                }
+                foreach (var item in ToClean)
+                {
+                    Console.WriteLine($"[CleanUpTask] Cleaning {item}");
+                    VRCWS.userIDToVRCWS.Remove(item);
+                }
+
+                Thread.Sleep(1000 * 60);
+            }
+        } 
     }
 }

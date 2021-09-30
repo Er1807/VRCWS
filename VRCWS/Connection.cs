@@ -110,7 +110,7 @@ namespace VRCWSLibary
                 return;
             }
             MelonLogger.Msg("Retrying to establish connection");
-            MelonCoroutines.Start(RetryConnect(retryCount * 10));
+            MelonCoroutines.Start(RetryConnect(retryCount * 60));
         }
         public IEnumerator RetryConnect(int waititt)
         {
