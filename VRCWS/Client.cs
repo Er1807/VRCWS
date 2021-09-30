@@ -12,7 +12,7 @@ using UnhollowerRuntimeLib;
 using UnityEngine.Events;
 using System;
 
-[assembly: MelonInfo(typeof(VRCWSLibaryMod), "VRCWSLibary", "1.0.9", "Eric van Fandenfart")]
+[assembly: MelonInfo(typeof(VRCWSLibaryMod), "VRCWSLibary", "1.0.10", "Eric van Fandenfart")]
 [assembly: MelonGame]
 [assembly: MelonAdditionalDependencies("VRChatUtilityKit")]
 
@@ -27,6 +27,7 @@ namespace VRCWSLibary
         public string Target { get; set; }
         public string Content { get; set; }
         public string Signature { get; set; }
+        public DateTime TimeStamp { get; set; } = DateTime.Now;
 
         public override string ToString()
         {

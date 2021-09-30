@@ -116,7 +116,7 @@ namespace VRCWSLibary
 
         public static void Sign(Message msg)
         {
-            msg.Signature = Sign(msg.Content);
+            msg.Signature = Sign(GetMessageAsString(msg));
         }
 
         public static string Sign(string data)
@@ -127,8 +127,9 @@ namespace VRCWSLibary
         {
             if (!keysPerUser.ContainsKey(msg.Target))
                 return false;
-
-            return Verify(msg.Content, GetBytesFromBase64(msg.Signature), keysPerUser[msg.Target]);
+            if (DateTime.Now > msg.TimeStamp.AddSeconds(30))
+                return false;
+            return Verify(GetMessageAsString(msg), GetBytesFromBase64(msg.Signature), keysPerUser[msg.Target]);
 
         }
         public static bool Verify(string data, byte[] signature, RSAParameters remotePubkey)
@@ -137,6 +138,11 @@ namespace VRCWSLibary
             rsa.ImportParameters(remotePubkey);
             return rsa.VerifyData(GetStringASBytes(data), SHA256.Create(), signature);
 
+        }
+
+        private static string GetMessageAsString(Message msg)
+        {
+            return $"{msg.Method}:{msg.Content}:{msg.TimeStamp.Ticks}";
         }
 
         private static byte[] GetStringASBytes(string data)
