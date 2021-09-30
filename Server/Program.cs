@@ -126,7 +126,8 @@ namespace Server
             }
             else if (msg.Method == "DoesUserAcceptMethod")
             {
-                if (!ProxyRequestValid(msg))
+                msg.Method = msg.Content; // remap
+                if (ProxyRequestValid(msg))
                 {
                     Send(new Message() { Method = "MethodAccept", Target = msg.Target, Content = msg.Content });
                 }
