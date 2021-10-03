@@ -126,7 +126,7 @@ namespace VRCWSLibary
 
         public void Recieve(object sender, MessageEventArgs e)
         {
-            MelonLogger.Msg(e.Data);
+            //MelonLogger.Msg(e.Data);
             Message msg = JsonConvert.DeserializeObject<Message>(e.Data);
             Client.OnMessage(msg);
 
