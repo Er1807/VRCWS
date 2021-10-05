@@ -55,7 +55,7 @@ namespace VRCWSLibary
 
 
 
-            MelonLogger.Msg("Connecting as " + userID);
+            MelonLogger.Msg("Logging in");
             Send(new Message() { Method = "StartConnection", Content = userID });
             SetWorldID();
         }
@@ -148,6 +148,7 @@ namespace VRCWSLibary
             }
             else if (msg.Method == "Connected")
             {
+                MelonLogger.Msg("Logged in");
                 connected = true;
                 Client.OnConnected();
             }

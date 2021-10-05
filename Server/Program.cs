@@ -50,13 +50,33 @@ namespace Server
 
         public List<AcceptedMethod> acceptableMethods = new List<AcceptedMethod>();
 
-        protected override void OnOpen()
+        protected override async void OnOpen()
         {
+            if (await RateLimiter.RateLimit("ipconnect:" + Context.Headers.Get("X-Forwarded-For"), 60, 10))
+                Error("Ratelimit", null);
             UpdateStats();
         }
 
-        protected override void OnMessage(MessageEventArgs e)
+        protected override async void OnMessage(MessageEventArgs e)
         {
+            if (!e.IsText)
+            {
+                Send(new Message() { Method = "Error", Content = "Invalid Message" });
+                Program.RecievedMessages.WithLabels("Invalid").Inc();
+                return;
+            }
+            if (await RateLimiter.RateLimit("message:" + ID, 5, 40))
+            {
+                SendAsync(new Message() { Method = "Error", Content = "Ratelimited" });
+                Program.RecievedMessages.WithLabels("Invalid").Inc();
+                return;
+            }
+            if (e.RawData.Length> 5120)//5kb
+            {
+                SendAsync(new Message() { Method = "Error", Content = "Message to large" });
+                Program.RecievedMessages.WithLabels("Invalid").Inc();
+                return;
+            }
             Message msg;
             try
             {
@@ -64,7 +84,7 @@ namespace Server
             }
             catch (Exception)
             {
-                Send(new Message() { Method = "Error", Content = "Invalid Message" });
+                SendAsync(new Message() { Method = "Error", Content = "Invalid Message" });
                 Program.RecievedMessages.WithLabels("Invalid").Inc();
                 return;
             }
@@ -72,37 +92,47 @@ namespace Server
             Console.WriteLine($"<< {userID}: {msg}");
             if (msg.Method == "StartConnection")
             {
+                if (msg.Content.Length > 60)
+                {
+                    SendAsync(new Message() { Method = "Error", Content = "username to large" });
+                    return;
+                }
                 if (userIDToVRCWS.ContainsKey(msg.Content)) {
-                    Send(new Message() { Method = "Error", Content = "AlreadyConnected" });
+                    SendAsync(new Message() { Method = "Error", Content = "AlreadyConnected" });
                     return;
                 }
                 userID = msg.Content;
                 userIDToVRCWS[userID] = this;
-                Send(new Message() { Method = "Connected" });
+                SendAsync(new Message() { Method = "Connected" });
                 return;
             }
 
             if (userID == null)
             {
-                Send(new Message() { Method = "Error", Content = "StartConnectionFirst" });
+                SendAsync(new Message() { Method = "Error", Content = "StartConnectionFirst" });
                 return;
             }
             if (msg.Method == "SetWorld")
             {
                 world = msg.Content;
-                Send(new Message() { Method = "WorldUpdated" });
+                SendAsync(new Message() { Method = "WorldUpdated" });
             }
             else if (msg.Method == "AcceptMethod")
             {
                 var acceptedMethod = msg.GetContentAs<AcceptedMethod>();
-                if (acceptableMethods.Any(x => x.Method == msg.Target))
+                if(acceptableMethods.Count > 1024)
                 {
-                    Send(new Message() { Method = "Error", Content = "MethodAlreadyExisted" });
+                    SendAsync(new Message() { Method = "Error", Content = "ToManyMethods" });
+                    return;
+                }
+                if (acceptableMethods.Any(x => x.Method == acceptedMethod.Method))
+                {
+                    SendAsync(new Message() { Method = "Error", Content = "MethodAlreadyExisted" });
                     return;
                 }
 
                 acceptableMethods.Add(acceptedMethod);
-                Send(new Message() { Method = "MethodsUpdated" });
+                SendAsync(new Message() { Method = "MethodsUpdated" });
                 UpdateStats();
 
             }
@@ -111,17 +141,17 @@ namespace Server
                 var acceptedMethod = msg.GetContentAs<AcceptedMethod>();
                 var item = acceptableMethods.FirstOrDefault(x => x.Method == acceptedMethod.Method);
                 acceptableMethods.Remove(item);
-                Send(new Message() { Method = "MethodsUpdated" });
+                SendAsync(new Message() { Method = "MethodsUpdated" });
                 UpdateStats();
             }
             else if (msg.Method == "IsOnline")
             {
                 if (userIDToVRCWS.ContainsKey(msg.Target)) {
-                    Send(new Message() { Method = "OnlineStatus", Target = msg.Target, Content = "Online" });
+                    SendAsync(new Message() { Method = "OnlineStatus", Target = msg.Target, Content = "Online" });
                 }
                 else
                 {
-                    Send(new Message() { Method = "OnlineStatus", Target = msg.Target, Content = "Offline" });
+                    SendAsync(new Message() { Method = "OnlineStatus", Target = msg.Target, Content = "Offline" });
                 }
             }
             else if (msg.Method == "DoesUserAcceptMethod")
@@ -129,11 +159,11 @@ namespace Server
                 msg.Method = msg.Content; // remap
                 if (ProxyRequestValid(msg))
                 {
-                    Send(new Message() { Method = "MethodAccept", Target = msg.Target, Content = msg.Content });
+                    SendAsync(new Message() { Method = "MethodAccept", Target = msg.Target, Content = msg.Content });
                 }
                 else
                 {
-                    Send(new Message() { Method = "MethodDecline", Target = msg.Target, Content = msg.Content });
+                    SendAsync(new Message() { Method = "MethodDecline", Target = msg.Target, Content = msg.Content });
                 }
             }
             else
@@ -142,8 +172,12 @@ namespace Server
             }
         }
 
-        private void ProxyMessage(Message msg)
+        private async void ProxyMessage(Message msg)
         {
+            if (await RateLimiter.RateLimit("message:" + userID, 5, 40))
+                Error("Ratelimit", null);
+
+
             Program.ProxyMessagesAttempt.WithLabels(msg.Method).Inc();
             if (!userIDToVRCWS.ContainsKey(msg.Target))
             {
@@ -158,7 +192,7 @@ namespace Server
                 return;
             }
             msg.Target = userID;
-            remoteUser.Send(msg);
+            remoteUser.SendAsync(msg);
             Program.ProxyMessages.WithLabels(msg.Method).Inc();
         }
 
@@ -202,6 +236,13 @@ namespace Server
             Console.WriteLine($">> {msg}");
             Send(JsonConvert.SerializeObject(msg));
         }
+        public void SendAsync(Message msg)
+        {
+            Program.SendMessages.WithLabels(msg.Method).Inc();
+            Console.WriteLine($">> {msg}");
+            
+            Send(JsonConvert.SerializeObject(msg));
+        }
 
         public void UpdateStats()
         {
@@ -238,13 +279,14 @@ namespace Server
 
         public static void Main(string[] args)
         {
-
+            
             var exitEvent = new ManualResetEvent(false);
             Console.CancelKeyPress += (sender, eventArgs) => {
                 eventArgs.Cancel = true;
                 exitEvent.Set();
             };
             var wssv = new WebSocketServer("ws://0.0.0.0:8080");
+            
             wssv.Log.Output = (_, __) => { }; // disable log
             var server = new MetricServer(9100);
             wssv.AddWebSocketService<VRCWS>("/VRC");
