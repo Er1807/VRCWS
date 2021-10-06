@@ -27,7 +27,15 @@ namespace Server
             }
             public T GetContentAs<T>()
             {
-                return JsonConvert.DeserializeObject<T>(Content);
+                try
+                {
+
+                    return JsonConvert.DeserializeObject<T>(Content);
+                }
+                catch (Exception)
+                {
+                    return default;
+                }
             }
         }
 
@@ -53,7 +61,7 @@ namespace Server
         protected override async void OnOpen()
         {
             if (await RateLimiter.RateLimit("ipconnect:" + Context.Headers.Get("X-Forwarded-For"), 60, 10))
-                Error("Ratelimit", null);
+                Sessions.CloseSession(ID,CloseStatusCode.PolicyViolation, "Ratelimited");
             UpdateStats();
         }
 
@@ -92,9 +100,9 @@ namespace Server
             Console.WriteLine($"<< {userID}: {msg}");
             if (msg.Method == "StartConnection")
             {
-                if (msg.Content.Length > 60)
+                if (msg.Content.Length > 40)
                 {
-                    SendAsync(new Message() { Method = "Error", Content = "username to large" });
+                    Sessions.CloseSession(ID, CloseStatusCode.PolicyViolation, "username to large");
                     return;
                 }
                 if (userIDToVRCWS.ContainsKey(msg.Content)) {
@@ -119,8 +127,13 @@ namespace Server
             }
             else if (msg.Method == "AcceptMethod")
             {
-                var acceptedMethod = msg.GetContentAs<AcceptedMethod>();
-                if(acceptableMethods.Count > 1024)
+                var acceptedMethod = msg.GetContentAs<AcceptedMethod>(); 
+                if (acceptedMethod == null)
+                {
+                    SendAsync(new Message() { Method = "Error", Content = "DontTryToCrashTheServer" });
+                    return;
+                }
+                if (acceptableMethods.Count > 1024)
                 {
                     SendAsync(new Message() { Method = "Error", Content = "ToManyMethods" });
                     return;
@@ -139,6 +152,11 @@ namespace Server
             else if (msg.Method == "RemoveMethod")
             {
                 var acceptedMethod = msg.GetContentAs<AcceptedMethod>();
+                if (acceptedMethod == null)
+                {
+                    SendAsync(new Message() { Method = "Error", Content = "DontTryToCrashTheServer" });
+                    return;
+                }
                 var item = acceptableMethods.FirstOrDefault(x => x.Method == acceptedMethod.Method);
                 acceptableMethods.Remove(item);
                 SendAsync(new Message() { Method = "MethodsUpdated" });
@@ -185,7 +203,6 @@ namespace Server
                 return;
             }
             var remoteUser = userIDToVRCWS[msg.Target];
-            var item = remoteUser.acceptableMethods.FirstOrDefault(x => x.Method == msg.Method);
             if (!ProxyRequestValid(msg))
             {
                 Send(new Message() { Method = "Error", Target = msg.Target, Content = "MethodNotAcepted" });

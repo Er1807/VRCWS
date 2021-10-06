@@ -32,13 +32,14 @@ namespace Server
 
         public static async Task<bool> RateLimit(string key, int secOffset, int maxAllowed)
         {
-            key += (DateTime.Now.Ticks / 10000000)/secOffset;
+            key += ":"+(DateTime.Now.Ticks / 10000000)/secOffset;
 
             var transaction = db.CreateTransaction();
             
             var result = transaction.StringIncrementAsync(key);
-            transaction.KeyExpireAsync(key, DateTime.Now.AddSeconds(secOffset));
+            transaction.KeyExpireAsync(key, DateTime.Now.AddSeconds(60));
             transaction.Execute();
+
             if ((await result) < maxAllowed)
                 return false;
             return true;
