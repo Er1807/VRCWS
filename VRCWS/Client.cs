@@ -12,7 +12,7 @@ using UnhollowerRuntimeLib;
 using UnityEngine.Events;
 using System;
 
-[assembly: MelonInfo(typeof(VRCWSLibaryMod), "VRCWSLibary", "1.0.11", "Eric van Fandenfart")]
+[assembly: MelonInfo(typeof(VRCWSLibaryMod), "VRCWSLibary", "1.0.12", "Eric van Fandenfart")]
 [assembly: MelonGame]
 [assembly: MelonAdditionalDependencies("VRChatUtilityKit")]
 
@@ -36,7 +36,15 @@ namespace VRCWSLibary
 
         public T GetContentAs<T>()
         {
-            return JsonConvert.DeserializeObject<T>(Content);
+            try
+            {
+                return JsonConvert.DeserializeObject<T>(Content);
+            }
+            catch (Exception)
+            {
+                //an invalid packed was tryed to be parsed. return null and let using function deal with it
+                return default;
+            }
         }
     }
     public class AcceptedMethod

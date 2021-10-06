@@ -127,7 +127,16 @@ namespace VRCWSLibary
         public void Recieve(object sender, MessageEventArgs e)
         {
             //MelonLogger.Msg(e.Data);
-            Message msg = JsonConvert.DeserializeObject<Message>(e.Data);
+            Message msg = null;
+            try
+            {
+                msg = JsonConvert.DeserializeObject<Message>(e.Data);
+            }
+            catch (Exception)
+            {
+                //should never happen as message is always send by client. Maybe if client and server have diffrent versions
+                return;
+            }
             Client.OnMessage(msg);
 
             if (msg.Method == "OnlineStatus")
