@@ -63,6 +63,7 @@ namespace Server
             if (await RateLimiter.RateLimit("ipconnect:" + Context.Headers.Get("X-Forwarded-For"), 60, 10))
                 Sessions.CloseSession(ID,CloseStatusCode.PolicyViolation, "Ratelimited");
             UpdateStats();
+            Redis.Increase("Connected");
         }
 
         protected override async void OnMessage(MessageEventArgs e)
@@ -71,18 +72,21 @@ namespace Server
             {
                 Send(new Message() { Method = "Error", Content = "Invalid Message" });
                 Program.RecievedMessages.WithLabels("Invalid").Inc();
+                Redis.Increase("Invalid");
                 return;
             }
             if (await RateLimiter.RateLimit("message:" + ID, 5, 40))
             {
                 SendAsync(new Message() { Method = "Error", Content = "Ratelimited" });
                 Program.RecievedMessages.WithLabels("Invalid").Inc();
+                Redis.Increase("Ratelimited");
                 return;
             }
             if (e.RawData.Length> 5120)//5kb
             {
                 SendAsync(new Message() { Method = "Error", Content = "Message to large" });
                 Program.RecievedMessages.WithLabels("Invalid").Inc();
+                Redis.Increase("Messagetolarge");
                 return;
             }
             Message msg;
@@ -94,9 +98,12 @@ namespace Server
             {
                 SendAsync(new Message() { Method = "Error", Content = "Invalid Message" });
                 Program.RecievedMessages.WithLabels("Invalid").Inc();
+                Redis.Increase("Invalid");
                 return;
             }
             Program.RecievedMessages.WithLabels(msg.Method).Inc();
+            Redis.Increase("RecievedMessages");
+            Redis.Increase($"RecievedMessage:{msg.Method}");
             Console.WriteLine($"<< {userID}: {msg}");
             if (msg.Method == "StartConnection")
             {
@@ -111,6 +118,7 @@ namespace Server
                 }
                 userID = msg.Content;
                 userIDToVRCWS[userID] = this;
+                Redis.Increase("UniqueConnected", userID);
                 SendAsync(new Message() { Method = "Connected" });
                 return;
             }
@@ -197,6 +205,8 @@ namespace Server
 
 
             Program.ProxyMessagesAttempt.WithLabels(msg.Method).Inc();
+            Redis.Increase("ProxyMessagesAttempt");
+            Redis.Increase($"ProxyMessagesAttempt:{msg.Method}");
             if (!userIDToVRCWS.ContainsKey(msg.Target))
             {
                 Send(new Message() { Method = "Error", Target = msg.Target, Content = "UserOffline" });
@@ -211,6 +221,8 @@ namespace Server
             msg.Target = userID;
             remoteUser.SendAsync(msg);
             Program.ProxyMessages.WithLabels(msg.Method).Inc();
+            Redis.Increase("ProxyMessages");
+            Redis.Increase($"ProxyMessage:{msg.Method}");
         }
 
         private bool ProxyRequestValid(Message msg)
@@ -256,6 +268,8 @@ namespace Server
         public void SendAsync(Message msg)
         {
             Program.SendMessages.WithLabels(msg.Method).Inc();
+            Redis.Increase($"SendMessages");
+            Redis.Increase($"SendMessage:{msg.Method}");
             Console.WriteLine($">> {msg}");
             
             Send(JsonConvert.SerializeObject(msg));

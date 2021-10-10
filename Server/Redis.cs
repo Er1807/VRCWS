@@ -6,18 +6,20 @@ using System.Threading.Tasks;
 
 namespace Server
 {
-    public class RedisRatelimiter
+    public class Redis
     {
         private static ConnectionMultiplexer conn;
         private static IDatabase db;
         public static bool Available => db != null;
 
-        static RedisRatelimiter(){
+        static Redis() {
             try
             {
                 ConfigurationOptions options = new ConfigurationOptions();
-                options.ConnectTimeout = 1000;
-                options.EndPoints.Add(Environment.GetEnvironmentVariable("REDIS")??"localhost");
+                options.ConnectTimeout = 2000;
+                options.ConnectRetry = 5;
+                options.EndPoints.Add(Environment.GetEnvironmentVariable("REDIS") ?? "localhost");
+                Console.WriteLine(Environment.GetEnvironmentVariable("REDIS"));
                 conn = ConnectionMultiplexer.Connect(options);
                 db = conn.GetDatabase();
                 Console.WriteLine("Connection to Redis established");
@@ -28,6 +30,7 @@ namespace Server
                 Console.WriteLine("Connection to Redis not available");
                 //not available
             }
+          
         }
 
         public static async Task<bool> RateLimit(string key, int secOffset, int maxAllowed)
@@ -43,6 +46,17 @@ namespace Server
             if ((await result) < maxAllowed)
                 return false;
             return true;
+        }
+
+        public static void Increase(string key, string value = null)
+        {
+            if (!Available)
+                return;
+            if (value == null)
+                db.StringIncrementAsync("Inc:" + key);
+            else
+                db.SetAdd(key, value);
+
         }
 
     }

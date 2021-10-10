@@ -12,8 +12,8 @@ namespace Server
 
         public static async Task<bool> RateLimit(string key, int secOffset, int maxAllowed)
         {
-            if (RedisRatelimiter.Available)
-                return await RedisRatelimiter.RateLimit(key, secOffset, maxAllowed);
+            if (Redis.Available)
+                return await Redis.RateLimit(key, secOffset, maxAllowed);
 
             return false;
             //TODO fix
