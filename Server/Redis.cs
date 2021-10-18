@@ -40,7 +40,7 @@ namespace Server
             var transaction = db.CreateTransaction();
             
             var result = transaction.StringIncrementAsync(key);
-            transaction.KeyExpireAsync(key, DateTime.Now.AddSeconds(60));
+            _ = transaction.KeyExpireAsync(key, DateTime.Now.AddSeconds(60));//larger then secoffset
             transaction.Execute();
 
             if ((await result) < maxAllowed)

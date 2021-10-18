@@ -61,7 +61,10 @@ namespace Server
         protected override async void OnOpen()
         {
             if (await RateLimiter.RateLimit("ipconnect:" + Context.Headers.Get("X-Forwarded-For"), 60, 10))
-                Sessions.CloseSession(ID,CloseStatusCode.PolicyViolation, "Ratelimited");
+            {
+                Program.RateLimits.Inc();
+                Sessions.CloseSession(ID, CloseStatusCode.PolicyViolation, "Ratelimited");
+            }
             UpdateStats();
             Redis.Increase("Connected");
         }
@@ -80,6 +83,7 @@ namespace Server
                 SendAsync(new Message() { Method = "Error", Content = "Ratelimited" });
                 Program.RecievedMessages.WithLabels("Invalid").Inc();
                 Redis.Increase("Ratelimited");
+                Program.RateLimits.Inc();
                 return;
             }
             if (e.RawData.Length> 5120)//5kb
@@ -200,8 +204,8 @@ namespace Server
 
         private async void ProxyMessage(Message msg)
         {
-            if (await RateLimiter.RateLimit("message:" + userID, 5, 40))
-                Error("Ratelimit", null);
+            //if (await RateLimiter.RateLimit("message:" + userID, 5, 40))
+            //   Error("Ratelimit", null);
 
 
             Program.ProxyMessagesAttempt.WithLabels(msg.Method).Inc();
@@ -301,6 +305,7 @@ namespace Server
     {
 
         public static readonly Gauge ActiveWS = Metrics.CreateGauge("vrcws_active_ws_current", "Active web sockets");
+        public static readonly Gauge RateLimits = Metrics.CreateGauge("vrcws_ratelimit_hit", "Rate Limit hits");
         public static readonly Gauge CurrentUsers = Metrics.CreateGauge("vrcws_active_users_current", "Active users");
         public static readonly Counter SendMessages = Metrics.CreateCounter("vrcws_send_messages", "Messages send", new CounterConfiguration { LabelNames = new[] { "method" } });
         public static readonly Counter RecievedMessages = Metrics.CreateCounter("vrcws_recieved_messages", "Messages recieved", new CounterConfiguration { LabelNames = new[] { "method" } });
