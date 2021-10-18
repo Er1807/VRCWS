@@ -27,7 +27,7 @@ namespace VRCWSLibary
         public string Target { get; set; }
         public string Content { get; set; }
         public string Signature { get; set; }
-        public DateTime TimeStamp { get; set; } = DateTime.Now;
+        public DateTime TimeStamp { get; set; } = DateTime.UtcNow;
 
         public override string ToString()
         {

@@ -127,7 +127,7 @@ namespace VRCWSLibary
         {
             if (!keysPerUser.ContainsKey(msg.Target))
                 return false;
-            if (DateTime.Now > msg.TimeStamp.AddSeconds(30))
+            if (DateTime.UtcNow > msg.TimeStamp.AddSeconds(30))
                 return false;
             return Verify(GetMessageAsString(msg), GetBytesFromBase64(msg.Signature), keysPerUser[msg.Target]);
 
