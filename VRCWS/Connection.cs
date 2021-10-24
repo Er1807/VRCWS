@@ -5,6 +5,7 @@ using System.Collections;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
+using UnityEngine;
 using VRChatUtilityKit.Utilities;
 using WebSocketSharp;
 
@@ -110,15 +111,13 @@ namespace VRCWSLibary
                 return;
             }
             MelonLogger.Msg("Retrying to establish connection");
-            MelonCoroutines.Start(RetryConnect(retryCount * 60));
+            MelonCoroutines.Start(RetryConnect(retryCount * 2));
         }
         public IEnumerator RetryConnect(int waititt)
         {
-            while (waititt == 0)
-            {
-                waititt -= 1;
-                yield return null;
-            }
+            
+            yield return new WaitForSeconds(waititt);
+            
             if (!connected)
                 Connect(server);
 
