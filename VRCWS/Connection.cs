@@ -25,6 +25,7 @@ namespace VRCWSLibary
         private string server;
         public int retryCount = 0;
         internal bool connected;
+        internal bool isAlive = false;
 
         public async void Connect(string server)
         {
@@ -37,9 +38,10 @@ namespace VRCWSLibary
             ws = new WebSocket(server);
             ws.OnMessage += Recieve;
             ws.OnError += Reconnect;
-            ws.OnClose += (_, close) => { connected = false; if (!close.WasClean) Reconnect(null, null); };
+            ws.OnClose += (_, close) => { connected = false; isAlive = false; if (!close.WasClean) Reconnect(null, null); };
             ws.EmitOnPing = false;
             ws.OnOpen += (_, _2) => {
+                isAlive = true;
                 MelonLogger.Msg($"Connected to {server}");
                 MelonCoroutines.Start(SetUserID());
             };
@@ -89,7 +91,7 @@ namespace VRCWSLibary
         {
             await AsyncUtils.YieldToMainThread();
             
-            if (ws != null && ws.IsAlive)
+            if (ws != null && isAlive)
             {
                 ws.Send(msg);
             }
