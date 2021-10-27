@@ -202,7 +202,7 @@ namespace Server
             }
         }
 
-        private async void ProxyMessage(Message msg)
+        private void ProxyMessage(Message msg)
         {
             //if (await RateLimiter.RateLimit("message:" + userID, 5, 40))
             //   Error("Ratelimit", null);
