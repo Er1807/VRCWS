@@ -122,8 +122,9 @@ namespace Server
                 }
                 userID = msg.Content;
                 userIDToVRCWS[userID] = this;
-                Redis.Increase("UniqueConnected", userID);
                 SendAsync(new Message() { Method = "Connected" });
+                Redis.Increase("UniqueConnected", userID);
+                UpdateStats();
                 return;
             }
 
@@ -158,7 +159,6 @@ namespace Server
 
                 acceptableMethods.Add(acceptedMethod);
                 SendAsync(new Message() { Method = "MethodsUpdated" });
-                UpdateStats();
 
             }
             else if (msg.Method == "RemoveMethod")
@@ -172,7 +172,6 @@ namespace Server
                 var item = acceptableMethods.FirstOrDefault(x => x.Method == acceptedMethod.Method);
                 acceptableMethods.Remove(item);
                 SendAsync(new Message() { Method = "MethodsUpdated" });
-                UpdateStats();
             }
             else if (msg.Method == "IsOnline")
             {
@@ -281,22 +280,9 @@ namespace Server
 
         public void UpdateStats()
         {
+
             Program.ActiveWS.Set(Sessions.Count);
             Program.CurrentUsers.Set(userIDToVRCWS.Count);
-
-            Dictionary<string, int> usersPerMethod = new Dictionary<string, int>();
-            foreach (var item in userIDToVRCWS)
-            {
-                foreach (var item2 in item.Value.acceptableMethods)
-                {
-                    usersPerMethod[item2.Method] = usersPerMethod.GetValueOrDefault(item2.Method, 0) + 1;
-                }
-            }
-
-            foreach (var item in usersPerMethod)
-            {
-                Program.ActiveMethods.WithLabels(item.Key).Set(item.Value);
-            }
 
         }
     }
@@ -335,7 +321,7 @@ namespace Server
             Console.WriteLine("Listening");
 
             Console.WriteLine("Starting Cleanup Task");
-            Task.Run(CleanUpTask);
+            Task.Run(ReportTask);
 
             exitEvent.WaitOne();
             wssv.Stop();
@@ -343,23 +329,33 @@ namespace Server
 
         }
 
-        private static void CleanUpTask()
+        private static void ReportTask()
         {
             while (true)
             {
-                List<string> ToClean = new List<string>();
-                foreach (var item in VRCWS.userIDToVRCWS)
+                try
                 {
-                    if (item.Value.State == WebSocketState.Closed || item.Value.State == WebSocketState.Closing)
-                        ToClean.Add(item.Key);
-                }
-                foreach (var item in ToClean)
+
+                
+                Dictionary<string, int> usersPerMethod = new Dictionary<string, int>();
+                foreach (var item in VRCWS.userIDToVRCWS.ToArray())//clone to mitigate errors
                 {
-                    Console.WriteLine($"[CleanUpTask] Cleaning {item}");
-                    VRCWS.userIDToVRCWS.Remove(item);
+                    foreach (var item2 in item.Value.acceptableMethods.ToArray())//clone to mitigate errors
+                    {
+                        usersPerMethod[item2.Method] = usersPerMethod.GetValueOrDefault(item2.Method, 0) + 1;
+                    }
                 }
 
-                Thread.Sleep(1000 * 60);
+                foreach (var item in usersPerMethod)
+                {
+                    ActiveMethods.WithLabels(item.Key).Set(item.Value);
+                }
+                }
+                catch (Exception)
+                {
+                    Console.WriteLine("[ReportTask] error occured");
+                }
+                Thread.Sleep(1000 * 3);
             }
         } 
     }

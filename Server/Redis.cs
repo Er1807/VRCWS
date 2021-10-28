@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Server
@@ -13,23 +14,31 @@ namespace Server
         public static bool Available => db != null;
 
         static Redis() {
-            try
-            {
-                ConfigurationOptions options = new ConfigurationOptions();
-                options.ConnectTimeout = 2000;
-                options.ConnectRetry = 5;
-                options.EndPoints.Add(Environment.GetEnvironmentVariable("REDIS") ?? "localhost");
-                Console.WriteLine(Environment.GetEnvironmentVariable("REDIS"));
-                conn = ConnectionMultiplexer.Connect(options);
-                db = conn.GetDatabase();
-                Console.WriteLine("Connection to Redis established");
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine(e);
-                Console.WriteLine("Connection to Redis not available");
-                //not available
-            }
+            
+            Task.Run(async() => {
+                try
+                {
+                    ThreadPool.SetMinThreads(250, 250);
+                    ConfigurationOptions options = new ConfigurationOptions();
+                    options.ConnectTimeout = 500;
+                    options.ConnectRetry = 5;
+                    options.AbortOnConnectFail = false;
+                    options.EndPoints.Add(Environment.GetEnvironmentVariable("REDIS") ?? "localhost");
+                    Console.WriteLine(Environment.GetEnvironmentVariable("REDIS"));
+                    conn = await ConnectionMultiplexer.ConnectAsync(options);
+
+                    db = conn.GetDatabase();
+                    Console.WriteLine("Connection to Redis established");
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine(e);
+                    Console.WriteLine("Connection to Redis not available");
+                    //not available
+                }
+            });
+                
+            
           
         }
 
