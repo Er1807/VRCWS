@@ -335,21 +335,23 @@ namespace Server
             {
                 try
                 {
-
-                
-                Dictionary<string, int> usersPerMethod = new Dictionary<string, int>();
-                foreach (var item in VRCWS.userIDToVRCWS.ToArray())//clone to mitigate errors
-                {
-                    foreach (var item2 in item.Value.acceptableMethods.ToArray())//clone to mitigate errors
+                    Dictionary<string, int> usersPerMethod = new Dictionary<string, int>();
+                    foreach (var item in VRCWS.userIDToVRCWS.ToArray())//clone to mitigate errors
                     {
-                        usersPerMethod[item2.Method] = usersPerMethod.GetValueOrDefault(item2.Method, 0) + 1;
+                        foreach (var item2 in item.Value.acceptableMethods.ToArray())//clone to mitigate errors
+                        {
+                            usersPerMethod[item2.Method] = usersPerMethod.GetValueOrDefault(item2.Method, 0) + 1;
+                        }
                     }
-                }
 
-                foreach (var item in usersPerMethod)
-                {
-                    ActiveMethods.WithLabels(item.Key).Set(item.Value);
-                }
+                    foreach (var item in usersPerMethod)
+                    {
+                        ActiveMethods.WithLabels(item.Key).Set(item.Value);
+                    }
+                    foreach (var item in ActiveMethods.GetAllLabelValues().Select(x => x[0]).Where(x => !usersPerMethod.ContainsKey(x)))
+                    {
+                        ActiveMethods.WithLabels(item).Remove();
+                    };
                 }
                 catch (Exception)
                 {
