@@ -81,7 +81,7 @@ namespace VRCWSLibary
 
 
             MelonPreferences_Entry<bool> entrypubKey = category.CreateEntry("Accept Public Key", false);
-            entrypubKey.Value = false;//force value to false on startup
+            //entrypubKey.Value = false;//force value to false on startup
             entrypubKey.Save();
             entrypubKey.OnValueChanged += (oldValue, newValue) => {
                 if (newValue) StartAcceptingKey();
