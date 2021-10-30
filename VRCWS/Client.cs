@@ -27,6 +27,7 @@ namespace VRCWSLibary
         public string Target { get; set; }
         public string Content { get; set; }
         public string Signature { get; set; }
+        public Guid ID { get; set; } = Guid.NewGuid();
         public DateTime TimeStamp { get; set; } = DateTime.UtcNow;
 
         public override string ToString()
@@ -237,14 +238,34 @@ namespace VRCWSLibary
         {
             Send(new Message() { Method = "IsOnline", Target = userID });
         }
+
+        public async Task<bool> IsUserOnlineAsyncResponse(string userID)
+        {
+            var response = await SendWithResponse(new Message() { Method = "IsOnline", Target = userID });
+
+            return response.Content == "Online";
+
+        }
+
         public void DoesUserAcceptMethod(string userID, string method)
         {
-            Send(new Message() { Method = "DoesUserAcceptMethod", Target = userID, Content=method });
+            Send(new Message() { Method = "DoesUserAcceptMethod", Target = userID, Content = method });
+        }
+        public async Task<bool> DoesUserAcceptMethodAsyncResponse(string userID, string method)
+        {
+            var response = await SendWithResponse(new Message() { Method = "DoesUserAcceptMethod", Target = userID, Content = method });
+
+            return response.Method == "MethodAccept";
+
         }
 
         public void Send(Message msg)
         {
             connection.Send(msg);
+        }
+        public async Task<Message> SendWithResponse(Message msg)
+        {
+            return await connection.SendWithResponse(msg);
         }
 
         public void OnMessage(Message msg)

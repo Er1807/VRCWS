@@ -2,9 +2,11 @@
 using Newtonsoft.Json;
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading.Tasks;
 using UnityEngine;
 using VRChatUtilityKit.Utilities;
 using WebSocketSharp;
@@ -77,6 +79,26 @@ namespace VRCWSLibary
             Send(JsonConvert.SerializeObject(msg));
         }
 
+        private readonly Dictionary<Guid, TaskCompletionSource<Message>> pendingMessages = new Dictionary<Guid, TaskCompletionSource<Message>>();
+        
+        public async Task<Message> SendWithResponse(Message msg, long timeout = 2000)//2 seconds
+        {
+            SecurityContext.Sign(msg);
+            Send(JsonConvert.SerializeObject(msg));
+            TaskCompletionSource<Message> tcs = new TaskCompletionSource<Message>();
+            pendingMessages[msg.ID] = tcs;
+
+            if (await Task.WhenAny(tcs.Task, Task.Delay(TimeSpan.FromMilliseconds(timeout))) == tcs.Task)
+            {
+                return await tcs.Task;
+            }
+            else
+            {
+                pendingMessages.Remove(msg.ID);
+                throw new TimeoutException("No response recieved in timeframe");
+            }
+        }
+
         public void Disconnect()
         {
             MelonLogger.Msg("Disconnecting");
@@ -138,6 +160,13 @@ namespace VRCWSLibary
                 //should never happen as message is always send by client. Maybe if client and server have diffrent versions
                 return;
             }
+
+            if(pendingMessages.ContainsKey(msg.ID))
+            {
+                pendingMessages[msg.ID].SetResult(msg);
+                pendingMessages.Remove(msg.ID);
+            }
+
             Client.OnMessage(msg);
 
             if (msg.Method == "OnlineStatus")
