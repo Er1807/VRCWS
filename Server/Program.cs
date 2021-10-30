@@ -15,10 +15,14 @@ namespace Server
     {
         public class Message
         {
+            public Message() { }
+            public Message(Message from) { ID = from.ID; }
+
             public string Method { get; set; }
             public string Target { get; set; }
             public string Content { get; set; }
             public string Signature { get; set; }
+            public Guid ID { get; set; } = Guid.NewGuid();
             public DateTime TimeStamp { get; set; } = DateTime.Now;
 
             public override string ToString()
@@ -117,12 +121,12 @@ namespace Server
                     return;
                 }
                 if (userIDToVRCWS.ContainsKey(msg.Content)) {
-                    SendAsync(new Message() { Method = "Error", Content = "AlreadyConnected" });
+                    SendAsync(new Message(msg) { Method = "Error", Content = "AlreadyConnected" });
                     return;
                 }
                 userID = msg.Content;
                 userIDToVRCWS[userID] = this;
-                SendAsync(new Message() { Method = "Connected" });
+                SendAsync(new Message(msg) { Method = "Connected" });
                 Redis.Increase("UniqueConnected", userID);
                 UpdateStats();
                 return;
@@ -130,35 +134,35 @@ namespace Server
 
             if (userID == null)
             {
-                SendAsync(new Message() { Method = "Error", Content = "StartConnectionFirst" });
+                SendAsync(new Message(msg) { Method = "Error", Content = "StartConnectionFirst" });
                 return;
             }
             if (msg.Method == "SetWorld")
             {
                 world = msg.Content;
-                SendAsync(new Message() { Method = "WorldUpdated" });
+                SendAsync(new Message(msg) { Method = "WorldUpdated" });
             }
             else if (msg.Method == "AcceptMethod")
             {
                 var acceptedMethod = msg.GetContentAs<AcceptedMethod>(); 
                 if (acceptedMethod == null)
                 {
-                    SendAsync(new Message() { Method = "Error", Content = "DontTryToCrashTheServer" });
+                    SendAsync(new Message(msg) { Method = "Error", Content = "DontTryToCrashTheServer" });
                     return;
                 }
                 if (acceptableMethods.Count > 1024)
                 {
-                    SendAsync(new Message() { Method = "Error", Content = "ToManyMethods" });
+                    SendAsync(new Message(msg) { Method = "Error", Content = "ToManyMethods" });
                     return;
                 }
                 if (acceptableMethods.Any(x => x.Method == acceptedMethod.Method))
                 {
-                    SendAsync(new Message() { Method = "Error", Content = "MethodAlreadyExisted" });
+                    SendAsync(new Message(msg) { Method = "Error", Content = "MethodAlreadyExisted" });
                     return;
                 }
 
                 acceptableMethods.Add(acceptedMethod);
-                SendAsync(new Message() { Method = "MethodsUpdated" });
+                SendAsync(new Message(msg) { Method = "MethodsUpdated" });
 
             }
             else if (msg.Method == "RemoveMethod")
@@ -166,21 +170,21 @@ namespace Server
                 var acceptedMethod = msg.GetContentAs<AcceptedMethod>();
                 if (acceptedMethod == null)
                 {
-                    SendAsync(new Message() { Method = "Error", Content = "DontTryToCrashTheServer" });
+                    SendAsync(new Message(msg) { Method = "Error", Content = "DontTryToCrashTheServer" });
                     return;
                 }
                 var item = acceptableMethods.FirstOrDefault(x => x.Method == acceptedMethod.Method);
                 acceptableMethods.Remove(item);
-                SendAsync(new Message() { Method = "MethodsUpdated" });
+                SendAsync(new Message(msg) { Method = "MethodsUpdated" });
             }
             else if (msg.Method == "IsOnline")
             {
                 if (userIDToVRCWS.ContainsKey(msg.Target)) {
-                    SendAsync(new Message() { Method = "OnlineStatus", Target = msg.Target, Content = "Online" });
+                    SendAsync(new Message(msg) { Method = "OnlineStatus", Target = msg.Target, Content = "Online" });
                 }
                 else
                 {
-                    SendAsync(new Message() { Method = "OnlineStatus", Target = msg.Target, Content = "Offline" });
+                    SendAsync(new Message(msg) { Method = "OnlineStatus", Target = msg.Target, Content = "Offline" });
                 }
             }
             else if (msg.Method == "DoesUserAcceptMethod")
@@ -188,11 +192,11 @@ namespace Server
                 msg.Method = msg.Content; // remap
                 if (ProxyRequestValid(msg))
                 {
-                    SendAsync(new Message() { Method = "MethodAccept", Target = msg.Target, Content = msg.Content });
+                    SendAsync(new Message(msg) { Method = "MethodAccept", Target = msg.Target, Content = msg.Content });
                 }
                 else
                 {
-                    SendAsync(new Message() { Method = "MethodDecline", Target = msg.Target, Content = msg.Content });
+                    SendAsync(new Message(msg) { Method = "MethodDecline", Target = msg.Target, Content = msg.Content });
                 }
             }
             else
@@ -212,13 +216,13 @@ namespace Server
             Redis.Increase($"ProxyMessagesAttempt:{msg.Method}");
             if (!userIDToVRCWS.ContainsKey(msg.Target))
             {
-                Send(new Message() { Method = "Error", Target = msg.Target, Content = "UserOffline" });
+                Send(new Message(msg) { Method = "Error", Target = msg.Target, Content = "UserOffline" });
                 return;
             }
             var remoteUser = userIDToVRCWS[msg.Target];
             if (!ProxyRequestValid(msg))
             {
-                Send(new Message() { Method = "Error", Target = msg.Target, Content = "MethodNotAcepted" });
+                Send(new Message(msg) { Method = "Error", Target = msg.Target, Content = "MethodNotAcepted" });
                 return;
             }
             msg.Target = userID;
