@@ -12,7 +12,7 @@ using UnhollowerRuntimeLib;
 using UnityEngine.Events;
 using System;
 
-[assembly: MelonInfo(typeof(VRCWSLibaryMod), "VRCWSLibary", "1.0.14", "Eric van Fandenfart")]
+[assembly: MelonInfo(typeof(VRCWSLibaryMod), "VRCWSLibary", "1.1.0", "Eric van Fandenfart")]
 [assembly: MelonGame]
 [assembly: MelonAdditionalDependencies("VRChatUtilityKit")]
 
@@ -95,23 +95,13 @@ namespace VRCWSLibary
 
         private void Init()
         {
-            var baseUIElement = GameObject.Find("UserInterface/MenuContent/Screens/UserInfo/Buttons/RightSideButtons/RightUpperButtonColumn/PlaylistsButton").gameObject;
-
-            var gameObject = GameObject.Instantiate(baseUIElement, baseUIElement.transform.parent, true);
-            gameObject.name = "Send_PubKey";
-
-            var uitext = gameObject.GetComponentInChildren<Text>();
-            uitext.text = "Send Pub Key";
-
-            var button = gameObject.GetComponent<Button>();
-            button.onClick = new Button.ButtonClickedEvent();
-            var action = new Action(delegate (){
+            UiManager.AddButtonToExistingGroup(UiManager.QMStateController.transform.Find("Container/Window/QMParent/Menu_SelectedUser_Local/ScrollRect/Viewport/VerticalLayoutGroup/Buttons_UserActions").gameObject, new SingleButton(new Action(() => {
                 MelonLogger.Msg($"Sending public key");
-                string userID = VRCUtils.ActiveUserInUserInfoMenu.id;
+                string userID = VRCUtils.ActiveUserInUserInfoMenu.ToIUser().prop_String_0;
                 SendPubKey(userID);
-            });
-            button.onClick.AddListener(DelegateSupport.ConvertDelegate<UnityAction>(action));
+            }), null, "Send Pub Key", "SendPubKey"));
 
+            MelonLogger.Msg("Buttons sucessfully created");
 
             MelonLogger.Msg("Buttons sucessfully created");
         }

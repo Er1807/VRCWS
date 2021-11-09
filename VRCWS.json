@@ -1,8 +1,8 @@
 {
   "_id": 263,
   "name": "VRCWSLibary",
-  "modversion": "1.0.13",
-  "vrchatversion": "1134",
+  "modversion": "1.1.0",
+  "vrchatversion": "1149",
   "loaderversion": "v0.4.3 Open-Beta",
   "modtype": "Mod",
   "author": "Eric van Fandenfart",
@@ -13,8 +13,8 @@
   "requirements": [
     "[VRChatUtilityKit](https://github.com/loukylor/VRC-Mods/tree/main/VRChatUtilityKit)"
   ],
-  "downloadlink": "https://github.com/Er1807/VRCWS/releases/download/v1.0.13/VRCWSLibary.dll",
+  "downloadlink": "https://github.com/Er1807/VRCWS/releases/download/v1.1.0/VRCWSLibary.dll",
   "sourcelink": "https://github.com/Er1807/VRCWS",
-  "changelog": "Fixed lag when rapidly sending messages. Thanks MarkViews",
+  "changelog": "Fixed lag when rapidly sending messages. Thanks MarkViews\nAdded Responses\n Added Support for 1149",
   "embedcolor": "7F60CA"
 }
