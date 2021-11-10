@@ -53,10 +53,10 @@ namespace VRCWSLibary
 
         public IEnumerator SetUserID()
         {
-            while (VRCPlayer.field_Internal_Static_VRCPlayer_0 == null || VRCPlayer.field_Internal_Static_VRCPlayer_0.prop_String_2 == null)
+            while (VRCPlayer.field_Internal_Static_VRCPlayer_0 == null || VRCPlayer.field_Internal_Static_VRCPlayer_0.prop_String_3 == null)
                 yield return null;
 
-            string userID = VRCPlayer.field_Internal_Static_VRCPlayer_0.prop_String_2;
+            string userID = VRCPlayer.field_Internal_Static_VRCPlayer_0.prop_String_3;
 
 
 
