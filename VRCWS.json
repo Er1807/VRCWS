@@ -1,7 +1,7 @@
 {
   "_id": 263,
   "name": "VRCWSLibary",
-  "modversion": "1.1.1",
+  "modversion": "1.1.2",
   "vrchatversion": "1149",
   "loaderversion": "v0.4.3 Open-Beta",
   "modtype": "Mod",
@@ -13,8 +13,8 @@
   "requirements": [
     "[VRChatUtilityKit](https://github.com/loukylor/VRC-Mods/tree/main/VRChatUtilityKit)"
   ],
-  "downloadlink": "https://github.com/Er1807/VRCWS/releases/download/v1.1.1/VRCWSLibary.dll",
+  "downloadlink": "https://github.com/Er1807/VRCWS/releases/download/v1.1.2/VRCWSLibary.dll",
   "sourcelink": "https://github.com/Er1807/VRCWS",
-  "changelog": "Rebuild",
+  "changelog": "Rebuil & Fixed property changes",
   "embedcolor": "7F60CA"
 }
