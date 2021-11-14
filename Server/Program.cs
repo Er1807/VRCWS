@@ -2,6 +2,7 @@
 using Prometheus;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -75,133 +76,140 @@ namespace Server
 
         protected override async void OnMessage(MessageEventArgs e)
         {
-            if (!e.IsText)
-            {
-                Send(new Message() { Method = "Error", Content = "Invalid Message" });
-                Program.RecievedMessages.WithLabels("Invalid").Inc();
-                Redis.Increase("Invalid");
-                return;
-            }
-            if (await RateLimiter.RateLimit("message:" + ID, 5, 40))
-            {
-                SendAsync(new Message() { Method = "Error", Content = "Ratelimited" });
-                Program.RecievedMessages.WithLabels("Invalid").Inc();
-                Redis.Increase("Ratelimited");
-                Program.RateLimits.Inc();
-                return;
-            }
-            if (e.RawData.Length> 5120)//5kb
-            {
-                SendAsync(new Message() { Method = "Error", Content = "Message to large" });
-                Program.RecievedMessages.WithLabels("Invalid").Inc();
-                Redis.Increase("Messagetolarge");
-                return;
-            }
-            Message msg;
+            Message msg = null;
             try
             {
-                msg = JsonConvert.DeserializeObject<Message>(e.Data);
-            }
-            catch (Exception)
-            {
-                SendAsync(new Message() { Method = "Error", Content = "Invalid Message" });
-                Program.RecievedMessages.WithLabels("Invalid").Inc();
-                Redis.Increase("Invalid");
-                return;
-            }
-            Program.RecievedMessages.WithLabels(msg.Method).Inc();
-            Redis.Increase("RecievedMessages");
-            Redis.Increase($"RecievedMessage:{msg.Method}");
-            Console.WriteLine($"<< {userID}: {msg}");
-            if (msg.Method == "StartConnection")
-            {
-                if (msg.Content.Length > 40)
+                if (!e.IsText)
                 {
-                    Sessions.CloseSession(ID, CloseStatusCode.PolicyViolation, "username to large");
+                    Send(new Message() { Method = "Error", Content = "Invalid Message" });
+                    Program.RecievedMessages.WithLabels("Invalid").Inc();
+                    Redis.Increase("Invalid");
                     return;
                 }
-                if (userIDToVRCWS.ContainsKey(msg.Content)) {
-                    SendAsync(new Message(msg) { Method = "Error", Content = "AlreadyConnected" });
+                if (await RateLimiter.RateLimit("message:" + ID, 5, 40))
+                {
+                    SendAsync(new Message() { Method = "Error", Content = "Ratelimited" });
+                    Program.RecievedMessages.WithLabels("Invalid").Inc();
+                    Redis.Increase("Ratelimited");
+                    Program.RateLimits.Inc();
                     return;
                 }
-                userID = msg.Content;
-                userIDToVRCWS[userID] = this;
-                SendAsync(new Message(msg) { Method = "Connected" });
-                Redis.Increase("UniqueConnected", userID);
-                UpdateStats();
-                return;
-            }
-
-            if (userID == null)
-            {
-                SendAsync(new Message(msg) { Method = "Error", Content = "StartConnectionFirst" });
-                return;
-            }
-            if (msg.Method == "SetWorld")
-            {
-                world = msg.Content;
-                SendAsync(new Message(msg) { Method = "WorldUpdated" });
-            }
-            else if (msg.Method == "AcceptMethod")
-            {
-                var acceptedMethod = msg.GetContentAs<AcceptedMethod>(); 
-                if (acceptedMethod == null)
+                if (e.RawData.Length> 5120)//5kb
                 {
-                    SendAsync(new Message(msg) { Method = "Error", Content = "DontTryToCrashTheServer" });
+                    SendAsync(new Message() { Method = "Error", Content = "Message to large" });
+                    Program.RecievedMessages.WithLabels("Invalid").Inc();
+                    Redis.Increase("Messagetolarge");
                     return;
                 }
-                if (acceptableMethods.Count > 1024)
+                try
                 {
-                    SendAsync(new Message(msg) { Method = "Error", Content = "ToManyMethods" });
+                    msg = JsonConvert.DeserializeObject<Message>(e.Data);
+                }
+                catch (Exception)
+                {
+                    SendAsync(new Message() { Method = "Error", Content = "Invalid Message" });
+                    Program.RecievedMessages.WithLabels("Invalid").Inc();
+                    Redis.Increase("Invalid");
                     return;
                 }
-                if (acceptableMethods.Any(x => x.Method == acceptedMethod.Method))
+                Program.RecievedMessages.WithLabels(msg.Method).Inc();
+                Redis.Increase("RecievedMessages");
+                Redis.Increase($"RecievedMessage:{msg.Method}");
+                Console.WriteLine($"<< {userID}: {msg}");
+                if (msg.Method == "StartConnection")
                 {
-                    SendAsync(new Message(msg) { Method = "Error", Content = "MethodAlreadyExisted" });
+                    if (msg.Content.Length > 40)
+                    {
+                        Sessions.CloseSession(ID, CloseStatusCode.PolicyViolation, "username to large");
+                        return;
+                    }
+                    if (userIDToVRCWS.ContainsKey(msg.Content)) {
+                        SendAsync(new Message(msg) { Method = "Error", Content = "AlreadyConnected" });
+                        return;
+                    }
+                    userID = msg.Content;
+                    userIDToVRCWS[userID] = this;
+                    SendAsync(new Message(msg) { Method = "Connected" });
+                    Redis.Increase("UniqueConnected", userID);
+                    UpdateStats();
                     return;
                 }
 
-                acceptableMethods.Add(acceptedMethod);
-                SendAsync(new Message(msg) { Method = "MethodsUpdated" });
-
-            }
-            else if (msg.Method == "RemoveMethod")
-            {
-                var acceptedMethod = msg.GetContentAs<AcceptedMethod>();
-                if (acceptedMethod == null)
+                if (userID == null)
                 {
-                    SendAsync(new Message(msg) { Method = "Error", Content = "DontTryToCrashTheServer" });
+                    SendAsync(new Message(msg) { Method = "Error", Content = "StartConnectionFirst" });
                     return;
                 }
-                var item = acceptableMethods.FirstOrDefault(x => x.Method == acceptedMethod.Method);
-                acceptableMethods.Remove(item);
-                SendAsync(new Message(msg) { Method = "MethodsUpdated" });
-            }
-            else if (msg.Method == "IsOnline")
-            {
-                if (userIDToVRCWS.ContainsKey(msg.Target)) {
-                    SendAsync(new Message(msg) { Method = "OnlineStatus", Target = msg.Target, Content = "Online" });
+                if (msg.Method == "SetWorld")
+                {
+                    world = msg.Content;
+                    SendAsync(new Message(msg) { Method = "WorldUpdated" });
+                }
+                else if (msg.Method == "AcceptMethod")
+                {
+                    var acceptedMethod = msg.GetContentAs<AcceptedMethod>(); 
+                    if (acceptedMethod == null)
+                    {
+                        SendAsync(new Message(msg) { Method = "Error", Content = "DontTryToCrashTheServer" });
+                        return;
+                    }
+                    if (acceptableMethods.Count > 1024)
+                    {
+                        SendAsync(new Message(msg) { Method = "Error", Content = "ToManyMethods" });
+                        return;
+                    }
+                    if (acceptableMethods.Any(x => x.Method == acceptedMethod.Method))
+                    {
+                        SendAsync(new Message(msg) { Method = "Error", Content = "MethodAlreadyExisted" });
+                        return;
+                    }
+
+                    acceptableMethods.Add(acceptedMethod);
+                    SendAsync(new Message(msg) { Method = "MethodsUpdated" });
+
+                }
+                else if (msg.Method == "RemoveMethod")
+                {
+                    var acceptedMethod = msg.GetContentAs<AcceptedMethod>();
+                    if (acceptedMethod == null)
+                    {
+                        SendAsync(new Message(msg) { Method = "Error", Content = "DontTryToCrashTheServer" });
+                        return;
+                    }
+                    var item = acceptableMethods.FirstOrDefault(x => x.Method == acceptedMethod.Method);
+                    acceptableMethods.Remove(item);
+                    SendAsync(new Message(msg) { Method = "MethodsUpdated" });
+                }
+                else if (msg.Method == "IsOnline")
+                {
+                    if (userIDToVRCWS.ContainsKey(msg.Target)) {
+                        SendAsync(new Message(msg) { Method = "OnlineStatus", Target = msg.Target, Content = "Online" });
+                    }
+                    else
+                    {
+                        SendAsync(new Message(msg) { Method = "OnlineStatus", Target = msg.Target, Content = "Offline" });
+                    }
+                }
+                else if (msg.Method == "DoesUserAcceptMethod")
+                {
+                    msg.Method = msg.Content; // remap
+                    if (ProxyRequestValid(msg))
+                    {
+                        SendAsync(new Message(msg) { Method = "MethodAccept", Target = msg.Target, Content = msg.Content });
+                    }
+                    else
+                    {
+                        SendAsync(new Message(msg) { Method = "MethodDecline", Target = msg.Target, Content = msg.Content });
+                    }
                 }
                 else
                 {
-                    SendAsync(new Message(msg) { Method = "OnlineStatus", Target = msg.Target, Content = "Offline" });
+                    ProxyMessage(msg);
                 }
             }
-            else if (msg.Method == "DoesUserAcceptMethod")
+            catch (Exception ex)
             {
-                msg.Method = msg.Content; // remap
-                if (ProxyRequestValid(msg))
-                {
-                    SendAsync(new Message(msg) { Method = "MethodAccept", Target = msg.Target, Content = msg.Content });
-                }
-                else
-                {
-                    SendAsync(new Message(msg) { Method = "MethodDecline", Target = msg.Target, Content = msg.Content });
-                }
-            }
-            else
-            {
-                ProxyMessage(msg);
+                Redis.LogError(ex, msg, userID, world);
             }
         }
 
@@ -258,7 +266,7 @@ namespace Server
             UpdateStats();
         }
 
-        protected override void OnError(ErrorEventArgs e)
+        protected override void OnError(WebSocketSharp.ErrorEventArgs e)
         {
             if (userID == null) return;
             Console.WriteLine($"User {userID} errored");
@@ -305,7 +313,7 @@ namespace Server
 
         public static void Main(string[] args)
         {
-            
+            AppDomain.CurrentDomain.UnhandledException += new UnhandledExceptionEventHandler(CrashHandler);
             var exitEvent = new ManualResetEvent(false);
             Console.CancelKeyPress += (sender, eventArgs) => {
                 eventArgs.Cancel = true;
@@ -331,6 +339,13 @@ namespace Server
             wssv.Stop();
             server.Stop();
 
+        }
+
+        private static void CrashHandler(object sender, UnhandledExceptionEventArgs args)
+        {
+            Exception e = (Exception)args.ExceptionObject;
+
+            Redis.LogError(e, null, null, null);
         }
 
         private static void ReportTask()

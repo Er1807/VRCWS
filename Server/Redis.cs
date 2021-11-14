@@ -1,4 +1,5 @@
-﻿using StackExchange.Redis;
+﻿using Newtonsoft.Json;
+using StackExchange.Redis;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -65,6 +66,30 @@ namespace Server
                 db.StringIncrementAsync("Inc:" + key);
             else
                 db.SetAdd(key, value);
+
+        }
+
+        public static void LogError(Exception exception, VRCWS.Message message, string userID, string world)
+        {
+            if (!Available)
+                return;
+            string time = DateTime.Now.Ticks / 10000000 + "";
+            db.StringSet($"Exception:{time}:Message", exception.Message);
+            db.StringSet($"Exception:{time}:StackTrace", exception.StackTrace);
+            if (exception.InnerException != null)
+            {
+                db.StringSet($"Exception:{time}:InnerMessage", exception.InnerException.Message);
+                db.StringSet($"Exception:{time}:InnerStackTrace", exception.InnerException.StackTrace);
+            }
+            if (message != null)
+                db.StringSet($"Exception:{time}:SendMessage", JsonConvert.SerializeObject(message));
+            
+            if (userID != null)
+                db.StringSet($"Exception:{time}:UserID", userID);
+
+            if (world != null)
+                db.StringSet($"Exception:{time}:World", world);
+            
 
         }
 
