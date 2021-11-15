@@ -217,11 +217,17 @@ namespace Server
         {
             //if (await RateLimiter.RateLimit("message:" + userID, 5, 40))
             //   Error("Ratelimit", null);
-
-
             Program.ProxyMessagesAttempt.WithLabels(msg.Method).Inc();
             Redis.Increase("ProxyMessagesAttempt");
             Redis.Increase($"ProxyMessagesAttempt:{msg.Method}");
+
+
+            if (msg.Target == null)
+            {
+                Send(new Message(msg) { Method = "Error", Content = "No target provided" });
+                return;
+            }
+            
             if (!userIDToVRCWS.ContainsKey(msg.Target))
             {
                 Send(new Message(msg) { Method = "Error", Target = msg.Target, Content = "UserOffline" });
