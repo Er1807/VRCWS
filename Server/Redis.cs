@@ -74,21 +74,22 @@ namespace Server
             if (!Available)
                 return;
             string time = DateTime.Now.Ticks / 10000000 + "";
-            db.StringSet($"Exception:{time}:Message", exception.Message);
-            db.StringSet($"Exception:{time}:StackTrace", exception.StackTrace);
+            var expire = new TimeSpan(5, 0, 0, 0);
+            db.StringSet($"Exception:{time}:Message", exception.Message , expire);
+            db.StringSet($"Exception:{time}:StackTrace", exception.StackTrace, expire);
             if (exception.InnerException != null)
             {
-                db.StringSet($"Exception:{time}:InnerMessage", exception.InnerException.Message);
-                db.StringSet($"Exception:{time}:InnerStackTrace", exception.InnerException.StackTrace);
+                db.StringSet($"Exception:{time}:InnerMessage", exception.InnerException.Message, expire);
+                db.StringSet($"Exception:{time}:InnerStackTrace", exception.InnerException.StackTrace, expire);
             }
             if (message != null)
-                db.StringSet($"Exception:{time}:SendMessage", JsonConvert.SerializeObject(message));
+                db.StringSet($"Exception:{time}:SendMessage", JsonConvert.SerializeObject(message), expire);
             
             if (userID != null)
-                db.StringSet($"Exception:{time}:UserID", userID);
+                db.StringSet($"Exception:{time}:UserID", userID, expire);
 
             if (world != null)
-                db.StringSet($"Exception:{time}:World", world);
+                db.StringSet($"Exception:{time}:World", world, expire);
             
 
         }

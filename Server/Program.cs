@@ -248,10 +248,11 @@ namespace Server
 
         private bool ProxyRequestValid(Message msg)
         {
-            if (!userIDToVRCWS.ContainsKey(msg.Target))
+            if (msg.Target == null || !userIDToVRCWS.ContainsKey(msg.Target))
             {
                 return false;
             }
+
             var remoteUser = userIDToVRCWS[msg.Target];
             var item = remoteUser.acceptableMethods.FirstOrDefault(x => x.Method == msg.Method);
             if (item == null
