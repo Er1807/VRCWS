@@ -32,7 +32,7 @@ namespace VRCWSLibary
         {
 
             this.server = server;
-            AsyncUtils.ToMain(() =>
+            AsyncUtilsVRCWS.ToMain(() =>
             {
                 Disconnect();
 
@@ -113,7 +113,7 @@ namespace VRCWSLibary
 
         public void Send(string msg)
         {
-            AsyncUtils.ToMain(()=> {
+            AsyncUtilsVRCWS.ToMain(()=> {
                 if (ws != null && isAlive)
                 {
                     ws.Send(msg);

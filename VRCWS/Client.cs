@@ -141,7 +141,7 @@ namespace VRCWSLibary
 
         public void AcceptPublicKey(Message msg)
         {
-            AsyncUtils.ToMain(() =>
+            AsyncUtilsVRCWS.ToMain(() =>
             {
                 VRCUiPopupManager.field_Private_Static_VRCUiPopupManager_0.Method_Public_Void_String_String_String_Action_String_Action_Action_1_VRCUiPopup_0(
                 "Accept PubKey", $"Accept Public key from user {msg.Target}", "Decline", new Action(() => { VRCUiManager.prop_VRCUiManager_0.HideScreen("POPUP"); }), "Accept",new Action( () => { SecurityContext.AcceptPubKey(msg.Content, msg.Target); VRCUiManager.prop_VRCUiManager_0.HideScreen("POPUP"); }));

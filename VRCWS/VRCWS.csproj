@@ -100,7 +100,7 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="AsyncUtils.cs" />
+    <Compile Include="AsyncUtilsVRCWS.cs" />
     <Compile Include="Client.cs" />
     <Compile Include="Connection.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
