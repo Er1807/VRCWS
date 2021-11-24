@@ -8,7 +8,6 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 using UnityEngine;
-using VRChatUtilityKit.Utilities;
 using WebSocketSharp;
 
 namespace VRCWSLibary
@@ -29,25 +28,28 @@ namespace VRCWSLibary
         internal bool connected;
         internal bool isAlive = false;
 
-        public async void Connect(string server)
+        public void Connect(string server)
         {
 
             this.server = server;
-            await AsyncUtils.YieldToMainThread();
-            Disconnect();
+            AsyncUtils.ToMain(() =>
+            {
+                Disconnect();
 
-            MelonLogger.Msg($"Connecting to {server}");
-            ws = new WebSocket(server);
-            ws.OnMessage += Recieve;
-            ws.OnError += Reconnect;
-            ws.OnClose += (_, close) => { connected = false; isAlive = false; if (!close.WasClean) Reconnect(null, null); };
-            ws.EmitOnPing = false;
-            ws.OnOpen += (_, _2) => {
-                isAlive = true;
-                MelonLogger.Msg($"Connected to {server}");
-                MelonCoroutines.Start(SetUserID());
-            };
-            ws.ConnectAsync();
+                MelonLogger.Msg($"Connecting to {server}");
+                ws = new WebSocket(server);
+                ws.OnMessage += Recieve;
+                ws.OnError += Reconnect;
+                ws.OnClose += (_, close) => { connected = false; isAlive = false; if (!close.WasClean) Reconnect(null, null); };
+                ws.EmitOnPing = false;
+                ws.OnOpen += (_, _2) => {
+                    isAlive = true;
+                    MelonLogger.Msg($"Connected to {server}");
+                    MelonCoroutines.Start(SetUserID());
+                };
+                ws.ConnectAsync();
+            });
+            
 
         }
 
@@ -109,18 +111,19 @@ namespace VRCWSLibary
 
         }
 
-        public async void Send(string msg)
+        public void Send(string msg)
         {
-            await AsyncUtils.YieldToMainThread();
+            AsyncUtils.ToMain(()=> {
+                if (ws != null && isAlive)
+                {
+                    ws.Send(msg);
+                }
+                else
+                {
+                    MelonLogger.Msg("Couldnt send " + msg);
+                }
+            });
             
-            if (ws != null && isAlive)
-            {
-                ws.Send(msg);
-            }
-            else
-            {
-                MelonLogger.Msg("Couldnt send " + msg);
-            }
 
         }
 

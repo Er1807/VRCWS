@@ -3,14 +3,15 @@ using Newtonsoft.Json;
 using System.Collections.Generic;
 using VRCWSLibary;
 using HarmonyLib;
-using VRChatUtilityKit.Utilities;
-using VRChatUtilityKit.Ui;
 using UnityEngine;
 using System.Threading.Tasks;
 using UnityEngine.UI;
-using UnhollowerRuntimeLib;
-using UnityEngine.Events;
 using System;
+using VRC.UI.Elements.Menus;
+using System.Collections;
+using VRC.DataModel.Core;
+using TMPro;
+using VRC.UI.Elements;
 
 [assembly: MelonInfo(typeof(VRCWSLibaryMod), "VRCWSLibary", "1.1.2", "Eric van Fandenfart")]
 [assembly: MelonGame]
@@ -90,23 +91,39 @@ namespace VRCWSLibary
             };
 
             HarmonyInstance.Patch(typeof(NetworkManager).GetMethod("OnJoinedRoom"), new HarmonyMethod(typeof(Client).GetMethod("OnJoinedRoom")));
-            VRCUtils.OnUiManagerInit += Init;
+            MelonCoroutines.Start(WaitForUIInit());
         }
 
-        private void Init()
+        private IEnumerator WaitForUIInit()
         {
-            UiManager.AddButtonToExistingGroup(UiManager.QMStateController.transform.Find("Container/Window/QMParent/Menu_SelectedUser_Local/ScrollRect/Viewport/VerticalLayoutGroup/Buttons_UserActions").gameObject, new SingleButton(new Action(() => {
-                MelonLogger.Msg($"Sending public key");
-                string userID = VRCUtils.ActiveUserInUserInfoMenu.ToIUser().prop_String_0;
-                SendPubKey(userID);
-            }), null, "Send Pub Key", "SendPubKey"));
+            while (VRCUiManager.prop_VRCUiManager_0 == null)
+                yield return null;
+            while (GameObject.Find("UserInterface").transform.Find("Canvas_QuickMenu(Clone)/Container/Window/QMParent") == null)
+                yield return null;
 
-            MelonLogger.Msg("Buttons sucessfully created");
-
-            MelonLogger.Msg("Buttons sucessfully created");
+            LoadUI();
         }
 
+        private MenuStateController menuStateController;
+        private void LoadUI()
+        {
+            menuStateController = GameObject.Find("UserInterface").transform.Find("Canvas_QuickMenu(Clone)").GetComponent<MenuStateController>();
+            //based on VRCUKs code
+            var camera = menuStateController.transform.Find("Container/Window/QMParent/Menu_Camera/Scrollrect/Viewport/VerticalLayoutGroup/Buttons/Button_Screenshot");
+            var useractions = menuStateController.transform.Find("Container/Window/QMParent/Menu_SelectedUser_Local/ScrollRect/Viewport/VerticalLayoutGroup/Buttons_UserActions");
+            var createFreezeButton = GameObject.Instantiate(camera, useractions);
+            BindingExtensions.Method_Public_Static_ButtonBindingHelper_Button_Action_0(createFreezeButton.GetComponent<Button>(), new Action(() =>
+            {
+                MelonLogger.Msg($"Sending public key");
+                string userID = menuStateController.GetComponentInChildren<SelectedUserMenuQM>().field_Private_IUser_0.prop_String_0;
+                SendPubKey(userID);
+            }));
+            createFreezeButton.GetComponentInChildren<TextMeshProUGUI>().text = "Send Pub Key";
 
+
+
+
+        }
         public void StartAcceptingKey()
         {
             Client.GetClient().RegisterEvent("SendPubKey", AcceptPublicKey, true, false);
@@ -124,11 +141,11 @@ namespace VRCWSLibary
 
         public void AcceptPublicKey(Message msg)
         {
-            Task.Run(async () => {
-                await AsyncUtils.YieldToMainThread();
-                UiManager.OpenPopup("Accept PubKey", $"Accept Public key from user {msg.Target}", "Decline", () => { UiManager.ClosePopup(); }, "Accept", () => { SecurityContext.AcceptPubKey(msg.Content, msg.Target); UiManager.ClosePopup(); });
+            AsyncUtils.ToMain(() =>
+            {
+                VRCUiPopupManager.field_Private_Static_VRCUiPopupManager_0.Method_Public_Void_String_String_String_Action_String_Action_Action_1_VRCUiPopup_0(
+                "Accept PubKey", $"Accept Public key from user {msg.Target}", "Decline", new Action(() => { VRCUiManager.prop_VRCUiManager_0.HideScreen("POPUP"); }), "Accept",new Action( () => { SecurityContext.AcceptPubKey(msg.Content, msg.Target); VRCUiManager.prop_VRCUiManager_0.HideScreen("POPUP"); }));
             });
-            
         }
     }
 
