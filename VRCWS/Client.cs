@@ -13,7 +13,7 @@ using VRC.DataModel.Core;
 using TMPro;
 using VRC.UI.Elements;
 
-[assembly: MelonInfo(typeof(VRCWSLibaryMod), "VRCWSLibary", "1.1.3", "Eric van Fandenfart")]
+[assembly: MelonInfo(typeof(VRCWSLibaryMod), "VRCWSLibary", "1.1.4", "Eric van Fandenfart")]
 [assembly: MelonGame]
 [assembly: MelonAdditionalDependencies("VRChatUtilityKit")]
 
@@ -73,8 +73,11 @@ namespace VRCWSLibary
             entryURL.OnValueChanged += (oldValue, newValue) => { Client.GetClient().connection.Connect(newValue); };
             entryConnect.OnValueChanged += (oldValue, newValue) => {
                 Client.GetClient().connection.retryCount = 0;
-                if (newValue) Client.GetClient().connection.Connect(entryURL.Value);
-                else Client.GetClient().connection.Disconnect();
+                AsyncUtilsVRCWS.ToMain(() =>
+                {
+                    if (newValue) Client.GetClient().connection.Connect(entryURL.Value);
+                    else Client.GetClient().connection.Disconnect();
+                });
             };
 
 
@@ -146,6 +149,12 @@ namespace VRCWSLibary
                 VRCUiPopupManager.field_Private_Static_VRCUiPopupManager_0.Method_Public_Void_String_String_String_Action_String_Action_Action_1_VRCUiPopup_0(
                 "Accept PubKey", $"Accept Public key from user {msg.Target}", "Decline", new Action(() => { VRCUiManager.prop_VRCUiManager_0.HideScreen("POPUP"); }), "Accept",new Action( () => { SecurityContext.AcceptPubKey(msg.Content, msg.Target); VRCUiManager.prop_VRCUiManager_0.HideScreen("POPUP"); }));
             });
+        }
+
+        public override void OnUpdate()
+        {
+            if (AsyncUtilsVRCWS._toMainThreadQueue.TryDequeue(out Action result))
+                result.Invoke();
         }
     }
 
