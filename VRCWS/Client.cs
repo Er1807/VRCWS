@@ -13,7 +13,7 @@ using VRC.DataModel.Core;
 using TMPro;
 using VRC.UI.Elements;
 
-[assembly: MelonInfo(typeof(VRCWSLibaryMod), "VRCWSLibary", "1.1.4", "Eric van Fandenfart")]
+[assembly: MelonInfo(typeof(VRCWSLibaryMod), "VRCWSLibary", "1.1.5", "Eric van Fandenfart")]
 [assembly: MelonGame]
 [assembly: MelonAdditionalDependencies("VRChatUtilityKit")]
 
@@ -86,12 +86,13 @@ namespace VRCWSLibary
 
 
             MelonPreferences_Entry<bool> entrypubKey = category.CreateEntry("Accept Public Key", false);
-            //entrypubKey.Value = false;//force value to false on startup
-            entrypubKey.Save();
             entrypubKey.OnValueChanged += (oldValue, newValue) => {
                 if (newValue) StartAcceptingKey();
                 else StopAcceptingKeys();
             };
+
+            if(entrypubKey.Value) 
+                StartAcceptingKey();
 
             HarmonyInstance.Patch(typeof(NetworkManager).GetMethod("OnJoinedRoom"), new HarmonyMethod(typeof(Client).GetMethod("OnJoinedRoom")));
             MelonCoroutines.Start(WaitForUIInit());
