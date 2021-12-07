@@ -13,7 +13,7 @@ using VRC.DataModel.Core;
 using TMPro;
 using VRC.UI.Elements;
 
-[assembly: MelonInfo(typeof(VRCWSLibaryMod), "VRCWSLibary", "1.1.5", "Eric van Fandenfart")]
+[assembly: MelonInfo(typeof(VRCWSLibaryMod), "VRCWSLibary", "1.1.6", "Eric van Fandenfart")]
 [assembly: MelonGame]
 [assembly: MelonAdditionalDependencies("VRChatUtilityKit")]
 
@@ -197,9 +197,12 @@ namespace VRCWSLibary
             allClients.Add(this);
             ConnectRecieved += () =>
             {
-                foreach (var item in Methods.Keys)
+                lock (Methods)
                 {
-                    AcceptMethod(item);
+                    foreach (var item in Methods.Keys)
+                    {
+                        AcceptMethod(item);
+                    }
                 }
             };
         }     
@@ -219,27 +222,33 @@ namespace VRCWSLibary
         //https://forum.unity.com/threads/solved-dictionary-of-delegate-such-that-each-value-hold-multiple-methods.506880/
         public void RegisterEvent(string method, MessageEvent e, bool worldOnly = true, bool signatureRequired = true)
         {
-            MelonLogger.Msg($"Registering Event {method}");
-            AcceptedMethod acceptedMethod = new AcceptedMethod() {Method = method, WorldOnly = worldOnly, SignatureRequired = signatureRequired };
-            if (Methods.TryGetValue(acceptedMethod, out MessageEvent EventStored))
+            lock (Methods)
             {
-                EventStored += e;
-                Methods[acceptedMethod] = EventStored; // Copy the newly aggregated delegate back into the dictionary.
-            }
-            else
-            {
-                EventStored += e;
-                Methods.Add(acceptedMethod, EventStored);
-                if (Connected)
-                    AcceptMethod(acceptedMethod);
+                MelonLogger.Msg($"Registering Event {method}");
+                AcceptedMethod acceptedMethod = new AcceptedMethod() { Method = method, WorldOnly = worldOnly, SignatureRequired = signatureRequired };
+                if (Methods.TryGetValue(acceptedMethod, out MessageEvent EventStored))
+                {
+                    EventStored += e;
+                    Methods[acceptedMethod] = EventStored; // Copy the newly aggregated delegate back into the dictionary.
+                }
+                else
+                {
+                    EventStored += e;
+                    Methods.Add(acceptedMethod, EventStored);
+                    if (Connected)
+                        AcceptMethod(acceptedMethod);
+                }
             }
         }
 
         public void RemoveEvent(string method)
         {
-            AcceptedMethod acceptedMethod = new AcceptedMethod() { Method = method};
-            Methods.Remove(acceptedMethod);
-            RemoveMethod(acceptedMethod);
+            lock (Methods)
+            {
+                AcceptedMethod acceptedMethod = new AcceptedMethod() { Method = method };
+                Methods.Remove(acceptedMethod);
+                RemoveMethod(acceptedMethod);
+            }
         }
 
         private void AcceptMethod(AcceptedMethod method)
