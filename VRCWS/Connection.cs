@@ -5,10 +5,14 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading.Tasks;
 using UnityEngine;
+using VRC.Core;
+using VRC.DataModel;
 using WebSocketSharp;
+using static VRCWSLibary.Strings;
 
 namespace VRCWSLibary
 {
@@ -45,7 +49,7 @@ namespace VRCWSLibary
                 ws.OnOpen += (_, _2) => {
                     isAlive = true;
                     MelonLogger.Msg($"Connected to {server}");
-                    MelonCoroutines.Start(SetUserID());
+                    MelonCoroutines.Start(WaitForID());
                 };
                 ws.ConnectAsync();
             });
@@ -53,19 +57,58 @@ namespace VRCWSLibary
 
         }
 
-        public IEnumerator SetUserID()
+        public async void Register(string userID)
+        {
+            var result = await SendWithResponse(new Message() { Method = RegisterString, Target = userID });
+            if (result.Method != RegisterChallengeString)
+            {
+                MelonLogger.Msg("Something went wrong while registering. Abording");
+                return;
+            }
+            string oldBio = APIUser.CurrentUser.bio;
+            APIUser.CurrentUser.UpdateBio(result.Content, new Action(async() => {
+                string csr = SecurityContext.PemEncodeSigningRequest(SecurityContext.CreateCSR(userID));
+                var result2 = await SendWithResponse(new Message() { Method = RegisterChallengeCompletedString, Content = csr });
+
+            }), new Action<string>((y) => {}));
+        }
+
+        public IEnumerator WaitForID()
         {
             while (VRCPlayer.field_Internal_Static_VRCPlayer_0 == null || VRCPlayer.field_Internal_Static_VRCPlayer_0.prop_String_3 == null)
                 yield return null;
 
+            
             string userID = VRCPlayer.field_Internal_Static_VRCPlayer_0.prop_String_3;
+            X509Certificate2 userCert = SecurityContext.GetCertificate(userID);
 
+            if (userCert == null)
+            {
+                // request from user
+                Register(userID);
+            }
 
-
-            MelonLogger.Msg("Logging in");
-            Send(new Message() { Method = "StartConnection", Content = userID });
-            SetWorldID();
+            Login(userID, userCert);
         }
+
+        public async void Login(string userID, X509Certificate2 userCert)
+        {
+            MelonLogger.Msg("Logging in");
+
+            LoginMessage message = new LoginMessage() { Certificate = Convert.ToBase64String(userCert.RawData), Signature = SecurityContext.Sign("userID") };
+
+            var result = await SendWithResponse(new Message() { Method = LoginString, Content = JsonConvert.SerializeObject(message) });
+
+            if(result.Method == ConnectedString)
+            {
+                SetWorldID();
+            }
+            else{
+                //Register again 
+            }
+
+        }
+
         public void SetWorldID()
         {
 
@@ -77,7 +120,6 @@ namespace VRCWSLibary
 
         public void Send(Message msg)
         {
-            SecurityContext.Sign(msg);
             Send(JsonConvert.SerializeObject(msg));
         }
 
@@ -85,7 +127,6 @@ namespace VRCWSLibary
         
         public async Task<Message> SendWithResponse(Message msg, long timeout = 2000)//2 seconds
         {
-            SecurityContext.Sign(msg);
             Send(JsonConvert.SerializeObject(msg));
             TaskCompletionSource<Message> tcs = new TaskCompletionSource<Message>();
             pendingMessages[msg.ID] = tcs;
@@ -211,12 +252,6 @@ namespace VRCWSLibary
         private void HandleCustomEvent(Message msg)
         {
             var item = Client.Methods.Keys.FirstOrDefault(x => x.Method == msg.Method);
-
-            if (item.SignatureRequired && !SecurityContext.Verify(msg))
-            {
-                MelonLogger.Msg("Ignoring message with invalid or untrusted signature");
-                return;
-            }
 
             if (item != null)
                 Client.Methods[item]?.Invoke(msg);

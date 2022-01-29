@@ -2,6 +2,7 @@
 using StackExchange.Redis;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -58,18 +59,17 @@ namespace Server
             return true;
         }
 
-        public static void Increase(string key, string value = null)
+        public static async Task Increase(string key, string value = null)
         {
             if (!Available)
                 return;
             if (value == null)
-                db.StringIncrementAsync("Inc:" + key);
+                await db.StringIncrementAsync("Inc:" + key);
             else
-                db.SetAdd(key, value);
-
+                await db.SetAddAsync(key, value);
         }
 
-        public static void LogError(Exception exception, VRCWS.Message message, string userID, string world)
+        public static void LogError(Exception exception, Message message, string userID, string world)
         {
             if (!Available)
                 return;
@@ -90,8 +90,57 @@ namespace Server
 
             if (world != null)
                 db.StringSet($"Exception:{time}:World", world, expire);
-            
+        }
 
+        public static async Task Set(string key, string value)
+        {
+            if (!Available)
+                return;
+            await db.StringSetAsync(key, value);
+        }
+
+        public static async Task<string> Get(string key)
+        {
+            if (!Available)
+                return null;
+            return await db.StringGetAsync(key);
+        }
+
+        public static async Task AddFriend(string userID1, string userID2)
+        {
+            await db.SetAddAsync($"Friends:{userID1}", userID2);
+            await db.SetAddAsync($"Friends:{userID2}", userID1);
+        }
+
+        public static async Task<List<string>> GetFriends(string userID1)
+        {
+           return (await db.SetMembersAsync($"Friends:{userID1}")).Select(x=>x.ToString()).ToList();
+        }
+
+        public static async Task RemoveFriend(string userID1, string userID2)
+        {
+
+            await db.SetRemoveAsync($"Friends:{userID1}", userID2);
+            await db.SetRemoveAsync($"Friends:{userID2}", userID1);
+        }
+        public static async Task<bool> IsFriend(string userID1, string userID2)
+        {
+            return await db.SetContainsAsync($"Friends:{userID1}", userID2);
+        }
+
+        public static async Task AddFriendRequest(string userID1, string userID2)
+        {
+            await db.SetAddAsync($"FriendRequests:{userID1}", userID2);
+        }
+
+        public static async Task RemoveFriendRequest(string userID1, string userID2)
+        {
+            await db.SetRemoveAsync($"FriendRequests:{userID1}", userID2);
+        }
+
+        public static async Task<bool> HasFriendRequest(string userID1, string userID2)
+        {
+            return await db.SetContainsAsync($"FriendRequests:{userID1}", userID2);
         }
 
     }

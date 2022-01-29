@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 
 namespace VRCWSLibary
@@ -55,96 +56,108 @@ namespace VRCWSLibary
 
         private static RSACryptoServiceProvider provider;
 
-        public static RSAParametersWrapper privKey;
-        public static RSAParametersWrapper pubKey;
-
-        public static Dictionary<string, RSAParameters> keysPerUser = new Dictionary<string, RSAParameters>();
-
         private static void CreateKeys(){
             provider = new RSACryptoServiceProvider(2048);
 
-            privKey = RSAParametersWrapper.FromRSAParameters(provider.ExportParameters(true));
-            pubKey = RSAParametersWrapper.FromRSAParameters(provider.ExportParameters(false));
-
             MelonLogger.Msg("Created new keys");
-
-        }
-
-        public static void AcceptPubKey(string pubkey, string userId)
-        {
-            keysPerUser[userId] = JsonConvert.DeserializeObject<RSAParameters>(pubkey);
-
-            MelonLogger.Msg($"Accepted key for user {userId}");
-            SaveKeys();
-        }
-
-
-        public static void SaveKeys()
-        {
             Directory.CreateDirectory("UserData/VRCWS");
-            File.WriteAllText("UserData/VRCWS/privkey.json", JsonConvert.SerializeObject(privKey));
-            File.WriteAllText("UserData/VRCWS/pubkeydictionary.json", JsonConvert.SerializeObject(keysPerUser));
-            MelonLogger.Msg("Saving keys");
+            File.WriteAllText("UserData/VRCWS/privkey.json", JsonConvert.SerializeObject(RSAParametersWrapper.FromRSAParameters(provider.ExportParameters(true))));
+            MelonLogger.Msg("Saving key");
+
         }
+
 
         public static void LoadKeys()
         {
             if (File.Exists("UserData/VRCWS/privkey.json"))
             {
-                privKey = JsonConvert.DeserializeObject<RSAParametersWrapper>(File.ReadAllText("UserData/VRCWS/privkey.json"));
-                keysPerUser = JsonConvert.DeserializeObject<Dictionary<string, RSAParameters>>(File.ReadAllText("UserData/VRCWS/pubkeydictionary.json"));
-                MelonLogger.Msg(keysPerUser.Count);
+                var privKey = JsonConvert.DeserializeObject<RSAParametersWrapper>(File.ReadAllText("UserData/VRCWS/privkey.json"));
                 provider = new RSACryptoServiceProvider();
 
                 provider.ImportParameters(RSAParametersWrapper.FromRSAParameters(privKey));
-
-                pubKey = RSAParametersWrapper.FromRSAParameters(provider.ExportParameters(false));
-
             }
             else
             {
                 CreateKeys();
-                SaveKeys();
             }
             MelonLogger.Msg("Loaded keys");
         }
 
-        public static string GetPublicKeyAsJsonString()
+        public static X509Certificate2 GetCertificate(string userID)
         {
-            return JsonConvert.SerializeObject(pubKey);
+            if (!File.Exists($"UserData/VRCWS/{userID}.cert"))
+            {
+                return null;
+            }
+
+            return new X509Certificate2(File.ReadAllBytes($"UserData/VRCWS/{userID}.cert"));
         }
 
-        public static void Sign(Message msg)
+        public static void SaveCertificate(string userID, X509Certificate2 certificate)
         {
-            msg.Signature = Sign(GetMessageAsString(msg));
+            File.WriteAllBytes($"UserData/VRCWS/{userID}.cert", certificate.RawData);
+        }
+
+        public static CertificateRequest CreateCSR(string userID)
+        {
+            
+            CertificateRequest req = new CertificateRequest(
+                                    $"CN={userID}",
+                                    RSA.Create(provider.ExportParameters(true)),
+                                    HashAlgorithmName.SHA256,
+                                    RSASignaturePadding.Pkcs1);
+
+            req.CertificateExtensions.Add(
+                new X509BasicConstraintsExtension(false, false, 0, false));
+
+
+            req.CertificateExtensions.Add(
+                new X509KeyUsageExtension(
+                    X509KeyUsageFlags.DigitalSignature | X509KeyUsageFlags.NonRepudiation,
+                    false));
+
+            req.CertificateExtensions.Add(
+                new X509EnhancedKeyUsageExtension(
+                    new OidCollection
+                    {
+                    new Oid("1.3.6.1.5.5.7.3.2")
+                    },
+                    true));
+
+            req.CertificateExtensions.Add(
+                new X509SubjectKeyIdentifierExtension(req.PublicKey, false));
+            req.CreateSigningRequest();
+            return req;
+        }
+
+        public static string PemEncodeSigningRequest(CertificateRequest request)
+        {
+            byte[] pkcs10 = request.CreateSigningRequest();
+            StringBuilder builder = new StringBuilder();
+
+            builder.AppendLine("-----BEGIN CERTIFICATE REQUEST-----");
+
+            string base64 = Convert.ToBase64String(pkcs10);
+
+            int offset = 0;
+            const int LineLength = 64;
+
+            while (offset < base64.Length)
+            {
+                int lineEnd = Math.Min(offset + LineLength, base64.Length);
+                builder.AppendLine(base64.Substring(offset, lineEnd - offset));
+                offset = lineEnd;
+            }
+
+            builder.AppendLine("-----END CERTIFICATE REQUEST-----");
+            return builder.ToString();
         }
 
         public static string Sign(string data)
         {
             return GetBase64FromBytes(provider.SignData(GetStringASBytes(data), SHA256.Create()));
         }
-        public static bool Verify(Message msg)
-        {
-            if (!keysPerUser.ContainsKey(msg.Target))
-                return false;
-            if (DateTime.UtcNow > msg.TimeStamp.AddSeconds(30))
-                return false;
-            return Verify(GetMessageAsString(msg), GetBytesFromBase64(msg.Signature), keysPerUser[msg.Target]);
-
-        }
-        public static bool Verify(string data, byte[] signature, RSAParameters remotePubkey)
-        {
-            var rsa = new RSACryptoServiceProvider();
-            rsa.ImportParameters(remotePubkey);
-            return rsa.VerifyData(GetStringASBytes(data), SHA256.Create(), signature);
-
-        }
-
-        private static string GetMessageAsString(Message msg)
-        {
-            return $"{msg.Method}:{msg.Content}:{msg.TimeStamp.Ticks}";
-        }
-
+        
         private static byte[] GetStringASBytes(string data)
         {
             if (data == null) data = "";
