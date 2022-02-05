@@ -68,7 +68,9 @@ namespace Server
         protected override async void OnOpen()
         {
             pingtimer = new Timer(
-                (x) => Ping(),
+                (x) => {
+                    Ping();
+                    },
                 null, 60000,60000);
 
             UpdateStats();
