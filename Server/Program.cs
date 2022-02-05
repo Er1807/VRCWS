@@ -27,12 +27,6 @@ namespace Server
 
         protected override async void OnOpen()
         {
-            if (await RateLimiter.RateLimit("ipconnect:" + Context.Headers.Get("X-Forwarded-For"), 60, 10))
-            {
-                Program.RateLimits.Inc();
-                Sessions.CloseSession(ID, CloseStatusCode.PolicyViolation, RatelimitedString);
-            }
-            UpdateStats();
             await Redis.Increase("Connected");
         }
 
