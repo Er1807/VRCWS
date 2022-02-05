@@ -52,6 +52,7 @@ namespace VRCWSLibary
                     MelonCoroutines.Start(WaitForID());
                 };
                 ws.ConnectAsync();
+                
             });
             
 

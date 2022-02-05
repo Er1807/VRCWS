@@ -10,7 +10,12 @@
     <PackageReference Include="prometheus-net" Version="5.0.2" />
     <PackageReference Include="RestSharp" Version="107.2.1" />
     <PackageReference Include="StackExchange.Redis" Version="2.2.88" />
-    <PackageReference Include="WebSocketSharp-netstandard" Version="1.0.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="websocket-sharp">
+      <HintPath>..\websocket-sharp.dll</HintPath>
+    </Reference>
   </ItemGroup>
 
 </Project>
