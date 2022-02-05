@@ -11,8 +11,8 @@ namespace Server
 {
     public class Redis
     {
-        private static ConnectionMultiplexer conn;
-        private static IDatabase db;
+        private static readonly ConnectionMultiplexer conn;
+        private static readonly IDatabase db;
         public static bool Available => db != null;
 
         static Redis()
@@ -21,7 +21,7 @@ namespace Server
             try
             {
                 ThreadPool.SetMinThreads(250, 250);
-                ConfigurationOptions options = new ConfigurationOptions();
+                ConfigurationOptions options = new();
                 options.ConnectTimeout = 500;
                 options.ConnectRetry = 5;
                 options.AbortOnConnectFail = false;

@@ -14,8 +14,8 @@ namespace Server
     class VrcApi
     {
 
-        private static ConcurrentQueue<(TaskCompletionSource<string>, string)> queue = new();
-        private RestClient client;
+        private static readonly ConcurrentQueue<(TaskCompletionSource<string>, string)> queue = new();
+        private readonly RestClient client;
 
         static VrcApi()
         {
@@ -25,12 +25,12 @@ namespace Server
 
                 foreach (var entry in users)
                 {
-                    new VrcApi(entry);
+                    _ = new VrcApi(entry);
                 }
             }
             catch (Exception ex)
             {
-
+                Redis.LogError(ex, null, null, null);
                 throw;
             }
             
@@ -89,7 +89,7 @@ namespace Server
 
         public static async Task<string> QueueGetUserBio(string userID)
         {
-            TaskCompletionSource<string> tcs = new TaskCompletionSource<string>();
+            TaskCompletionSource<string> tcs = new();
             queue.Enqueue((tcs, userID));
 
             return await tcs.Task;

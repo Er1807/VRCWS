@@ -41,7 +41,7 @@ namespace Server
             return this;
         }
 
-        public void Execute(VRCWS userVRCWS, MessageEventArgs e) => firstMiddleware?.Process(userVRCWS, e, null);
+        public async Task Execute(VRCWS userVRCWS, MessageEventArgs e) => await firstMiddleware?.Process(userVRCWS, e, null);
 
 
     }

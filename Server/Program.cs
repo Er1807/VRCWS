@@ -16,14 +16,14 @@ namespace Server
     {
 
 
-        public static Dictionary<string, VRCWS> userIDToVRCWS = new Dictionary<string, VRCWS>();
+        public static readonly Dictionary<string, VRCWS> userIDToVRCWS = new();
 
         public string userID;
         public string world;
         public bool authenticated = false;
         public string randomText = "";
 
-        public List<AcceptedMethod> acceptableMethods = new List<AcceptedMethod>();
+        public List<AcceptedMethod> acceptableMethods = new();
 
         private Timer pingtimer;
 
@@ -38,16 +38,13 @@ namespace Server
                 null, 60000,60000);
 
             UpdateStats();
-            Redis.Increase("Connected");
+            await Redis.Increase("Connected");
         }
 
         protected override async void OnMessage(MessageEventArgs e)
         {
-            Manager.Execute(this, e);
+            await Manager.Execute(this, e);
         }
-
-
-
 
         public bool ProxyRequestValid(Message msg)
         {
@@ -118,7 +115,7 @@ namespace Server
 
         public static void Main(string[] args)
         {
-            MiddleWareManager manager = new MiddleWareManager();
+            MiddleWareManager manager = new();
             manager.AddMiddleWare(new TryCatchMiddleware());
             manager.AddMiddleWare(new ParserMiddleWare());
             manager.AddMiddleWare(new AuthentificationMiddleware());
