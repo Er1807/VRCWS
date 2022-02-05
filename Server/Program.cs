@@ -4,7 +4,6 @@ using Server.Middlewares;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Security.Cryptography.X509Certificates;
 using System.Threading;
 using System.Threading.Tasks;
 using WebSocketSharp;
@@ -108,7 +107,6 @@ namespace Server
 
         public static void Main(string[] args)
         {
-
             MiddleWareManager manager = new MiddleWareManager();
             manager.AddMiddleWare(new TryCatchMiddleware());
             manager.AddMiddleWare(new ParserMiddleWare());

@@ -1,37 +1,79 @@
-﻿using System;
+﻿using RestSharp;
+using StackExchange.Redis;
+using System;
 using System.Collections.Concurrent;
+using System.Net;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using VRChat.API.Api;
-using VRChat.API.Client;
-using VRChat.API.Model;
+using RestSharp.Authenticators;
+using Newtonsoft.Json.Linq;
 
 namespace Server
 {
     class VrcApi
     {
-        private static UsersApi UserApi;
+
+        private static ConcurrentQueue<(TaskCompletionSource<string>, string)> queue = new();
+        private RestClient client;
+
         static VrcApi()
         {
-            // Authentication credentials
-            Configuration config = new Configuration();
-            config.Username = Environment.GetEnvironmentVariable("VRCUSER");
-            config.Password = Environment.GetEnvironmentVariable("VRCPASSWORD");
+            try
+            {
+                var users = Redis.GetHashSet("VerificationUsers").Result;
 
-            // Create instances of API's we'll need
-            AuthenticationApi authApi = new AuthenticationApi(config);
-            UserApi = new UsersApi(config);
+                foreach (var entry in users)
+                {
+                    new VrcApi(entry);
+                }
+            }
+            catch (Exception ex)
+            {
 
-            authApi.GetCurrentUser();
+                throw;
+            }
+            
+        }
 
+        public VrcApi(HashEntry entry)
+        {
+            client = new RestClient(new RestClientOptions() { UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.87 Safari/537.36" });
+
+            client.CookieContainer.Add(new Cookie("apiKey", "JlE5Jldo5Jibnk5O5hTx6XVqsJu4WJ26", "/", "api.vrchat.cloud"));
+
+
+            if (!string.IsNullOrEmpty(entry.Value))
+                client.CookieContainer.Add(new Cookie("auth", entry.Value, "/", "api.vrchat.cloud"));
+
+
+            string[] userpw = entry.Name.ToString().Split("<sep>");
+
+            client.Authenticator = new HttpBasicAuthenticator(userpw[0], userpw[1]);
+
+
+            var request = new RestRequest("https://api.vrchat.cloud/api/1/auth/user");
+
+            RestResponse response = client.ExecuteAsync(request).Result;
+
+            client.Authenticator = null;
+            if (!response.IsSuccessful)
+            {
+                Console.WriteLine("Not succesfull");
+                Redis.AddHash("VerificationUsers", entry.Name, "").Wait();
+                return;
+            }
+
+            string authtoken = response.Cookies.FirstOrDefault(x => x.Name == "auth").Value;
+
+            Redis.AddHash("VerificationUsers", entry.Name, authtoken ?? "").Wait();
 
             new Thread(Runner).Start();
 
         }
 
-        private static ConcurrentQueue<(TaskCompletionSource<string>, string)> queue = new();
 
-        private static void Runner()
+        private void Runner()
         {
             while (true)
             {
@@ -54,12 +96,20 @@ namespace Server
             
         }
 
-        private static async Task<string> GetUserBio(string userID)
+        private async Task<string> GetUserBio(string userID)
         {
 
-            User user = await UserApi.GetUserAsync(userID);
+            var request = new RestRequest($"https://api.vrchat.cloud/api/1/users/{userID}");
+            RestResponse response = await client.ExecuteAsync(request);
 
-            return user.Bio;
+            if (!response.IsSuccessful)
+            {
+                return "";
+            }
+
+            JObject userDetails = JObject.Parse(response.Content);
+
+            return userDetails["bio"].ToString();
         }
     }
 }

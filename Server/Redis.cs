@@ -15,41 +15,37 @@ namespace Server
         private static IDatabase db;
         public static bool Available => db != null;
 
-        static Redis() {
-            
-            Task.Run(async() => {
-                try
-                {
-                    ThreadPool.SetMinThreads(250, 250);
-                    ConfigurationOptions options = new ConfigurationOptions();
-                    options.ConnectTimeout = 500;
-                    options.ConnectRetry = 5;
-                    options.AbortOnConnectFail = false;
-                    options.EndPoints.Add(Environment.GetEnvironmentVariable("REDIS") ?? "localhost");
-                    Console.WriteLine(Environment.GetEnvironmentVariable("REDIS"));
-                    conn = await ConnectionMultiplexer.ConnectAsync(options);
+        static Redis()
+        {
 
-                    db = conn.GetDatabase();
-                    Console.WriteLine("Connection to Redis established");
-                }
-                catch (Exception e)
-                {
-                    Console.WriteLine(e);
-                    Console.WriteLine("Connection to Redis not available");
-                    //not available
-                }
-            });
-                
-            
-          
+            try
+            {
+                ThreadPool.SetMinThreads(250, 250);
+                ConfigurationOptions options = new ConfigurationOptions();
+                options.ConnectTimeout = 500;
+                options.ConnectRetry = 5;
+                options.AbortOnConnectFail = false;
+                options.EndPoints.Add(Environment.GetEnvironmentVariable("REDIS") ?? "localhost");
+                Console.WriteLine(Environment.GetEnvironmentVariable("REDIS"));
+                conn = ConnectionMultiplexer.Connect(options);
+
+                db = conn.GetDatabase();
+                Console.WriteLine("Connection to Redis established");
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e);
+                Console.WriteLine("Connection to Redis not available");
+                //not available
+            }
         }
 
         public static async Task<bool> RateLimit(string key, int secOffset, int maxAllowed)
         {
-            key += ":"+(DateTime.Now.Ticks / 10000000)/secOffset;
+            key += ":" + (DateTime.Now.Ticks / 10000000) / secOffset;
 
             var transaction = db.CreateTransaction();
-            
+
             var result = transaction.StringIncrementAsync(key);
             _ = transaction.KeyExpireAsync(key, DateTime.Now.AddSeconds(60));//larger then secoffset
             transaction.Execute();
@@ -75,7 +71,7 @@ namespace Server
                 return;
             string time = DateTime.Now.Ticks / 10000000 + "";
             var expire = new TimeSpan(5, 0, 0, 0);
-            db.StringSet($"Exception:{time}:Message", exception.Message , expire);
+            db.StringSet($"Exception:{time}:Message", exception.Message, expire);
             db.StringSet($"Exception:{time}:StackTrace", exception.StackTrace, expire);
             if (exception.InnerException != null)
             {
@@ -84,7 +80,7 @@ namespace Server
             }
             if (message != null)
                 db.StringSet($"Exception:{time}:SendMessage", JsonConvert.SerializeObject(message), expire);
-            
+
             if (userID != null)
                 db.StringSet($"Exception:{time}:UserID", userID, expire);
 
@@ -106,6 +102,27 @@ namespace Server
             return await db.StringGetAsync(key);
         }
 
+        public static async Task<HashEntry[]> GetHashSet(string key)
+        {
+            if (!Available)
+                return null;
+            return await db.HashGetAllAsync(key);
+        }
+
+        public static async Task<bool> AddHash(string key, string key2, string value)
+        {
+            if (!Available)
+                return false;
+            return await db.HashSetAsync(key, key2, value);
+        }
+
+        public static async Task<bool> RemoveHash(string key, string key2)
+        {
+            if (!Available)
+                return false;
+            return await db.HashDeleteAsync(key, key2);
+        }
+
         public static async Task AddFriend(string userID1, string userID2)
         {
             await db.SetAddAsync($"Friends:{userID1}", userID2);
@@ -114,7 +131,7 @@ namespace Server
 
         public static async Task<List<string>> GetFriends(string userID1)
         {
-           return (await db.SetMembersAsync($"Friends:{userID1}")).Select(x=>x.ToString()).ToList();
+            return (await db.SetMembersAsync($"Friends:{userID1}")).Select(x => x.ToString()).ToList();
         }
 
         public static async Task RemoveFriend(string userID1, string userID2)
