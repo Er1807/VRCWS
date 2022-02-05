@@ -63,13 +63,14 @@ namespace Server
 
         public List<AcceptedMethod> acceptableMethods = new List<AcceptedMethod>();
 
+        private Timer pingtimer;
+
         protected override async void OnOpen()
         {
-            if (await RateLimiter.RateLimit("ipconnect:" + Context.Headers.Get("X-Forwarded-For"), 60, 10))
-            {
-                Program.RateLimits.Inc();
-                Sessions.CloseSession(ID, CloseStatusCode.PolicyViolation, "Ratelimited");
-            }
+            pingtimer = new Timer(
+                (x) => Ping(),
+                null, 60000,60000);
+
             UpdateStats();
             Redis.Increase("Connected");
         }
@@ -271,6 +272,7 @@ namespace Server
             Console.WriteLine($"User {userID} dissconected");
             userIDToVRCWS.Remove(userID);
             UpdateStats();
+            pingtimer?.Dispose();
         }
 
         protected override void OnError(WebSocketSharp.ErrorEventArgs e)
@@ -279,6 +281,7 @@ namespace Server
             Console.WriteLine($"User {userID} errored");
             userIDToVRCWS.Remove(userID);
             UpdateStats();
+            pingtimer?.Dispose();
         }
 
         public void Send(Message msg)
@@ -327,7 +330,7 @@ namespace Server
                 exitEvent.Set();
             };
             var wssv = new WebSocketServer("ws://0.0.0.0:8080");
-            
+           
             wssv.Log.Output = (_, __) => { }; // disable log
             var server = new MetricServer(9100);
             wssv.AddWebSocketService<VRCWS>("/VRC");

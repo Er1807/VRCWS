@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -9,7 +9,12 @@
     <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
     <PackageReference Include="prometheus-net" Version="5.0.1" />
     <PackageReference Include="StackExchange.Redis" Version="2.2.50" />
-    <PackageReference Include="WebSocketSharp-netstandard" Version="1.0.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="websocket-sharp">
+      <HintPath>..\..\websocket-sharp\websocket-sharp\bin\Release\websocket-sharp.dll</HintPath>
+    </Reference>
   </ItemGroup>
 
 </Project>
