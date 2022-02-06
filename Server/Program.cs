@@ -270,20 +270,20 @@ namespace Server
 
         protected override void OnClose(CloseEventArgs e)
         {
+            pingtimer?.Dispose();
             if (userID == null) return;
             Console.WriteLine($"User {userID} dissconected");
             userIDToVRCWS.Remove(userID);
             UpdateStats();
-            pingtimer?.Dispose();
         }
 
         protected override void OnError(WebSocketSharp.ErrorEventArgs e)
         {
+            pingtimer?.Dispose();
             if (userID == null) return;
             Console.WriteLine($"User {userID} errored");
             userIDToVRCWS.Remove(userID);
             UpdateStats();
-            pingtimer?.Dispose();
         }
 
         public void Send(Message msg)
