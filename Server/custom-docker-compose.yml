@@ -1,0 +1,31 @@
+version: '3'
+services:
+  redis:
+    image: redis
+    restart: unless-stopped
+    ports:
+      - '10.100.100.1:6379:6379'
+    networks:
+      - proxy
+    volumes:
+      - ./data:/data
+  vrcws:
+    image: er1807/vrcws:latest
+    restart: unless-stopped
+    environment:
+      REDIS: 'redis:6379'
+    depends_on:
+      - "redis"
+    user: "${SUID}:${SGID}"
+    networks:
+      - proxy
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.vrcws.rule=Host(`vrcws.er1807.de`)
+      - traefik.http.routers.vrcws.tls=true
+      - traefik.http.routers.vrcws.tls.certresolver=letsEncryptProd
+      - traefik.http.routers.vrcws.service=vrcws
+      - traefik.http.services.vrcws.loadbalancer.server.port=8080
+networks:
+  proxy:
+    external: true
