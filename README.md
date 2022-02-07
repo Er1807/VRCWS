@@ -34,6 +34,8 @@ It is possible to create a new Instance of Client and therefore connect to anoth
 
 A docker server version can be found at https://hub.docker.com/r/er1807/vrcws. When hosting your own server (maybe even inside a vpn) you can increase the security.
 
+To host it look at the docker-compose.yml file in the Server folder. The custom-docker-compose.yml file is the current version I am hosting for wss://vrcws.er1807.de/VRC 
+
 But you are free to use wss://vrcws.er1807.de/VRC 
 
 Just don't be stupid. Also I can't say that the server will be running 24/7.
