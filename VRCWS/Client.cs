@@ -13,7 +13,7 @@ using VRC.DataModel.Core;
 using TMPro;
 using VRC.UI.Elements;
 
-[assembly: MelonInfo(typeof(VRCWSLibaryMod), "VRCWSLibary", "1.1.7", "Eric van Fandenfart")]
+[assembly: MelonInfo(typeof(VRCWSLibaryMod), "VRCWSLibary", "1.1.8", "Eric van Fandenfart")]
 [assembly: MelonGame]
 [assembly: MelonAdditionalDependencies("VRChatUtilityKit")]
 

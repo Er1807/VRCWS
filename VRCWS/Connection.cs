@@ -38,6 +38,7 @@ namespace VRCWSLibary
 
                 MelonLogger.Msg($"Connecting to {server}");
                 ws = new WebSocket(server);
+                ws.SslConfiguration.EnabledSslProtocols = System.Security.Authentication.SslProtocols.Tls;//wtf why was this working before
                 ws.OnMessage += Recieve;
                 ws.OnError += Reconnect;
                 ws.OnClose += (_, close) => { connected = false; isAlive = false; if (!close.WasClean) Reconnect(null, null); };
