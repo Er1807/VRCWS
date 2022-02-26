@@ -13,7 +13,7 @@ using VRC.DataModel.Core;
 using TMPro;
 using VRC.UI.Elements;
 
-[assembly: MelonInfo(typeof(VRCWSLibaryMod), "VRCWSLibary", "1.1.6", "Eric van Fandenfart")]
+[assembly: MelonInfo(typeof(VRCWSLibaryMod), "VRCWSLibary", "1.1.7", "Eric van Fandenfart")]
 [assembly: MelonGame]
 [assembly: MelonAdditionalDependencies("VRChatUtilityKit")]
 
@@ -116,7 +116,8 @@ namespace VRCWSLibary
             var camera = menuStateController.transform.Find("Container/Window/QMParent/Menu_Camera/Scrollrect/Viewport/VerticalLayoutGroup/Buttons/Button_Screenshot");
             var useractions = menuStateController.transform.Find("Container/Window/QMParent/Menu_SelectedUser_Local/ScrollRect/Viewport/VerticalLayoutGroup/Buttons_UserActions");
             var createFreezeButton = GameObject.Instantiate(camera, useractions);
-            BindingExtensions.Method_Public_Static_ButtonBindingHelper_Button_Action_0(createFreezeButton.GetComponent<Button>(), new Action(() =>
+            createFreezeButton.GetComponent<Button>().onClick.RemoveAllListeners();
+            createFreezeButton.GetComponent<Button>().onClick.AddListener(new Action(() =>
             {
                 MelonLogger.Msg($"Sending public key");
                 string userID = menuStateController.GetComponentInChildren<SelectedUserMenuQM>().field_Private_IUser_0.prop_String_0;
